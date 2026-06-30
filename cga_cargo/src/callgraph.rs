@@ -9,8 +9,8 @@ pub fn emit_dot(callgraph: &Callgraph, mut out: impl Write) -> anyhow::Result<()
         let node_id = NodeId::from(node_id as u32);
 
         const NAME_MAX_LEN: usize = 100;
-        let name = if node.name.len() > NAME_MAX_LEN {
-            format!("{}...", &node.name[0..NAME_MAX_LEN])
+        let name = if let Some((idx, _)) = node.name.char_indices().nth(NAME_MAX_LEN) {
+            format!("{}...", &node.name[..idx])
         } else {
             node.name.clone()
         };
