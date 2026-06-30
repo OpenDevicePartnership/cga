@@ -17,9 +17,7 @@ use rustc_middle::{
     middle::codegen_fn_attrs::CodegenFnAttrFlags,
     mir::{self},
     mono::MonoItem,
-    ty::{
-        self, GenericParamDefKind, Instance, Ty, TyCtxt, Unnormalized, layout::ValidityRequirement,
-    },
+    ty::{self, GenericParamDefKind, Instance, Ty, TyCtxt, Unnormalized, layout::ValidityRequirement},
 };
 use rustc_middle::{
     mir::interpret::{AllocId, GlobalAlloc, Scalar},
@@ -68,9 +66,7 @@ impl<'tcx> IntoIterator for MonoItems<'tcx> {
     type IntoIter = impl Iterator<Item = Spanned<MonoItem<'tcx>>>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.items
-            .into_iter()
-            .map(|(item, span)| respan(span, item))
+        self.items.into_iter().map(|(item, span)| respan(span, item))
     }
 }
 
@@ -125,11 +121,7 @@ pub fn collect_roots(tcx: TyCtxt<'_>, mode: MonoItemCollectionStrategy) -> Vec<M
     // can't actually be used, so we can just skip codegenning them.
     roots
         .into_iter()
-        .filter_map(
-            |Spanned {
-                 node: mono_item, ..
-             }| { mono_item.is_instantiable(tcx).then_some(mono_item) },
-        )
+        .filter_map(|Spanned { node: mono_item, .. }| mono_item.is_instantiable(tcx).then_some(mono_item))
         .collect()
 }
 
@@ -145,41 +137,30 @@ impl<'v> RootCollector<'_, 'v> {
         match self.tcx.def_kind(id.owner_id) {
             DefKind::Enum | DefKind::Struct | DefKind::Union => {
                 if self.strategy == MonoItemCollectionStrategy::Eager
-                    && !self
-                        .tcx
-                        .generics_of(id.owner_id)
-                        .requires_monomorphization(self.tcx)
+                    && !self.tcx.generics_of(id.owner_id).requires_monomorphization(self.tcx)
                 {
                     debug!("RootCollector: ADT drop-glue for `{id:?}`",);
                     let id_args =
-                        ty::GenericArgs::for_item(self.tcx, id.owner_id.to_def_id(), |param, _| {
-                            match param.kind {
-                                GenericParamDefKind::Lifetime => {
-                                    self.tcx.lifetimes.re_erased.into()
-                                }
-                                GenericParamDefKind::Type { .. }
-                                | GenericParamDefKind::Const { .. } => {
-                                    unreachable!(
-                                        "`own_requires_monomorphization` check means that \
+                        ty::GenericArgs::for_item(self.tcx, id.owner_id.to_def_id(), |param, _| match param.kind {
+                            GenericParamDefKind::Lifetime => self.tcx.lifetimes.re_erased.into(),
+                            GenericParamDefKind::Type { .. } | GenericParamDefKind::Const { .. } => {
+                                unreachable!(
+                                    "`own_requires_monomorphization` check means that \
                                 we should have no type/const params"
-                                    )
-                                }
+                                )
                             }
                         });
 
                     // This type is impossible to instantiate, so we should not try to
                     // generate a `drop_in_place` instance for it.
-                    if self.tcx.instantiate_and_check_impossible_predicates((
-                        id.owner_id.to_def_id(),
-                        id_args,
-                    )) {
+                    if self
+                        .tcx
+                        .instantiate_and_check_impossible_predicates((id.owner_id.to_def_id(), id_args))
+                    {
                         return;
                     }
 
-                    let ty = self
-                        .tcx
-                        .type_of(id.owner_id.to_def_id())
-                        .instantiate(self.tcx, id_args);
+                    let ty = self.tcx.type_of(id.owner_id.to_def_id()).instantiate(self.tcx, id_args);
                     // FIXME CGA rustc #155345
                     let ty = ty.skip_norm_wip();
                     assert!(!ty.has_non_region_param());
@@ -198,10 +179,7 @@ impl<'v> RootCollector<'_, 'v> {
                 MonoItemCollectionStrategy::NoConstOrStatic => {}
                 _ => {
                     let def_id = id.owner_id.to_def_id();
-                    debug!(
-                        "RootCollector: ItemKind::Static({})",
-                        self.tcx.def_path_str(def_id)
-                    );
+                    debug!("RootCollector: ItemKind::Static({})", self.tcx.def_path_str(def_id));
                     self.output.push(dummy_spanned(MonoItem::Static(def_id)));
                 }
             },
@@ -221,11 +199,7 @@ impl<'v> RootCollector<'_, 'v> {
                         // collect that?
                         return;
                     }
-                    if self
-                        .tcx
-                        .generics_of(id.owner_id)
-                        .own_requires_monomorphization()
-                    {
+                    if self.tcx.generics_of(id.owner_id).own_requires_monomorphization() {
                         return;
                     }
                     let Ok(val) = self.tcx.const_eval_poly(def_id) else {
@@ -256,12 +230,7 @@ impl<'v> RootCollector<'_, 'v> {
         match self.tcx.def_kind(def_id) {
             DefKind::Closure => {
                 // for 'pub async fn foo(..)' also trying to monomorphize foo::{closure}
-                let is_pub_fn_coroutine = match *self
-                    .tcx
-                    .type_of(def_id)
-                    .instantiate_identity()
-                    .skip_norm_wip()
-                    .kind()
+                let is_pub_fn_coroutine = match *self.tcx.type_of(def_id).instantiate_identity().skip_norm_wip().kind()
                 {
                     ty::Coroutine(cor_id, _args) => {
                         let tcx = self.tcx;
@@ -279,13 +248,7 @@ impl<'v> RootCollector<'_, 'v> {
                         .generics_of(self.tcx.typeck_root_def_id_local(def_id))
                         .requires_monomorphization(self.tcx)
                 {
-                    let instance = match *self
-                        .tcx
-                        .type_of(def_id)
-                        .instantiate_identity()
-                        .skip_norm_wip()
-                        .kind()
-                    {
+                    let instance = match *self.tcx.type_of(def_id).instantiate_identity().skip_norm_wip().kind() {
                         ty::Closure(def_id, args)
                         | ty::Coroutine(def_id, args)
                         | ty::CoroutineClosure(def_id, args) => {
@@ -311,16 +274,12 @@ impl<'v> RootCollector<'_, 'v> {
     }
 
     fn is_root(&self, def_id: LocalDefId) -> bool {
-        !self
-            .tcx
-            .generics_of(def_id)
-            .requires_monomorphization(self.tcx)
+        !self.tcx.generics_of(def_id).requires_monomorphization(self.tcx)
             && (self.is_extern(def_id)
                 || match self.strategy {
-                    MonoItemCollectionStrategy::Eager => !matches!(
-                        self.tcx.codegen_fn_attrs(def_id).inline,
-                        InlineAttr::Force { .. }
-                    ),
+                    MonoItemCollectionStrategy::Eager => {
+                        !matches!(self.tcx.codegen_fn_attrs(def_id).inline, InlineAttr::Force { .. })
+                    }
                     MonoItemCollectionStrategy::Lazy => {
                         self.entry_fn.and_then(|(id, _)| id.as_local()) == Some(def_id)
                             || self.tcx.is_reachable_non_generic(def_id)
@@ -348,15 +307,10 @@ impl<'v> RootCollector<'_, 'v> {
             return false;
         }
 
-        let has_export_link_name =
-            HasAttrs::get_attrs(def_id, &self.tcx)
-                .iter()
-                .any(|attr| match attr {
-                    rustc_hir::Attribute::Parsed(rustc_hir::attrs::AttributeKind::ExportName {
-                        ..
-                    }) => true,
-                    _ => false,
-                });
+        let has_export_link_name = HasAttrs::get_attrs(def_id, &self.tcx).iter().any(|attr| match attr {
+            rustc_hir::Attribute::Parsed(rustc_hir::attrs::AttributeKind::ExportName { .. }) => true,
+            _ => false,
+        });
         let no_mangle = attrs.flags.contains(CodegenFnAttrFlags::NO_MANGLE);
 
         has_export_link_name || no_mangle
@@ -368,8 +322,7 @@ impl<'v> RootCollector<'_, 'v> {
     fn push_if_root(&mut self, def_id: LocalDefId) {
         if self.is_root(def_id) {
             let instance = Instance::mono(self.tcx, def_id.to_def_id());
-            self.output
-                .push(create_fn_mono_item(self.tcx, instance, DUMMY_SP));
+            self.output.push(create_fn_mono_item(self.tcx, instance, DUMMY_SP));
         }
     }
 
@@ -395,12 +348,7 @@ impl<'v> RootCollector<'_, 'v> {
         let Some(start_def_id) = self.tcx.lang_items().start_fn() else {
             self.tcx.dcx().emit_fatal(crate::errors::StartNotFound);
         };
-        let main_ret_ty = self
-            .tcx
-            .fn_sig(main_def_id)
-            .no_bound_vars()
-            .unwrap()
-            .output();
+        let main_ret_ty = self.tcx.fn_sig(main_def_id).no_bound_vars().unwrap().output();
 
         // Given that `main()` has no arguments,
         // then its return type cannot have
@@ -436,17 +384,12 @@ fn visit_drop_use<'tcx>(
     visit_instance_use(tcx, instance, is_direct_call, source, output);
 }
 
-fn collect_const_value<'tcx>(
-    tcx: TyCtxt<'tcx>,
-    value: mir::ConstValue,
-    output: &mut MonoItems<'tcx>,
-) {
+fn collect_const_value<'tcx>(tcx: TyCtxt<'tcx>, value: mir::ConstValue, output: &mut MonoItems<'tcx>) {
     match value {
-        mir::ConstValue::Scalar(Scalar::Ptr(ptr, _size)) => {
-            collect_alloc(tcx, ptr.provenance.alloc_id(), output)
+        mir::ConstValue::Scalar(Scalar::Ptr(ptr, _size)) => collect_alloc(tcx, ptr.provenance.alloc_id(), output),
+        mir::ConstValue::Indirect { alloc_id, .. } | mir::ConstValue::Slice { alloc_id, meta: _ } => {
+            collect_alloc(tcx, alloc_id, output)
         }
-        mir::ConstValue::Indirect { alloc_id, .. }
-        | mir::ConstValue::Slice { alloc_id, meta: _ } => collect_alloc(tcx, alloc_id, output),
         _ => {}
     }
 }
@@ -458,10 +401,7 @@ fn visit_instance_use<'tcx>(
     source: Span,
     output: &mut MonoItems<'tcx>,
 ) {
-    debug!(
-        "visit_item_use({:?}, is_direct_call={:?})",
-        instance, is_direct_call
-    );
+    debug!("visit_item_use({:?}, is_direct_call={:?})", instance, is_direct_call);
     if !tcx.should_codegen_locally(instance) {
         return;
     }
@@ -476,9 +416,7 @@ fn visit_instance_use<'tcx>(
             if tcx.should_codegen_locally(panic_instance) {
                 output.push(create_fn_mono_item(tcx, panic_instance, source));
             }
-        } else if !intrinsic.must_be_overridden
-            && !tcx.sess.replaced_intrinsics.contains(&intrinsic.name)
-        {
+        } else if !intrinsic.must_be_overridden && !tcx.sess.replaced_intrinsics.contains(&intrinsic.name) {
             // Codegen the fallback body of intrinsics with fallback bodies.
             // We have to skip this otherwise as there's no body to codegen.
             // We also skip intrinsics the backend handles, to reduce monomorphizations.
@@ -526,11 +464,7 @@ fn visit_instance_use<'tcx>(
     }
 }
 
-fn create_fn_mono_item<'tcx>(
-    _tcx: TyCtxt<'tcx>,
-    instance: Instance<'tcx>,
-    source: Span,
-) -> Spanned<MonoItem<'tcx>> {
+fn create_fn_mono_item<'tcx>(_tcx: TyCtxt<'tcx>, instance: Instance<'tcx>, source: Span) -> Spanned<MonoItem<'tcx>> {
     respan(source, MonoItem::Fn(instance))
 }
 
@@ -576,21 +510,14 @@ fn collect_alloc<'tcx>(tcx: TyCtxt<'tcx>, alloc_id: AllocId, output: &mut MonoIt
     }
 }
 
-fn create_mono_items_for_default_impls<'tcx>(
-    tcx: TyCtxt<'tcx>,
-    item: ItemId,
-    output: &mut MonoItems<'tcx>,
-) {
+fn create_mono_items_for_default_impls<'tcx>(tcx: TyCtxt<'tcx>, item: ItemId, output: &mut MonoItems<'tcx>) {
     let impl_ = tcx.impl_trait_header(item.owner_id);
 
     if impl_.polarity == ty::ImplPolarity::Negative {
         return;
     }
 
-    if tcx
-        .generics_of(item.owner_id)
-        .own_requires_monomorphization()
-    {
+    if tcx.generics_of(item.owner_id).own_requires_monomorphization() {
         return;
     }
 
@@ -632,19 +559,14 @@ fn create_mono_items_for_default_impls<'tcx>(
             continue;
         }
 
-        if tcx
-            .generics_of(method.def_id)
-            .own_requires_monomorphization()
-        {
+        if tcx.generics_of(method.def_id).own_requires_monomorphization() {
             continue;
         }
 
         // As mentioned above, the method is legal to eagerly instantiate if it
         // only has lifetime generic parameters. This is validated by calling
         // `own_requires_monomorphization` on both the impl and method.
-        let args = trait_ref
-            .args
-            .extend_to(tcx, method.def_id, only_region_params);
+        let args = trait_ref.args.extend_to(tcx, method.def_id, only_region_params);
         let instance = ty::Instance::expect_resolve(tcx, typing_env, method.def_id, args, DUMMY_SP);
 
         let mono_item = create_fn_mono_item(tcx, instance, DUMMY_SP);

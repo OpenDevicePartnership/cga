@@ -110,9 +110,7 @@ impl Callgraph {
             }
 
             for root in other.roots.iter() {
-                result
-                    .roots
-                    .insert(node_dict[&other.nodes[root.0 as usize]]);
+                result.roots.insert(node_dict[&other.nodes[root.0 as usize]]);
             }
 
             for (from, tos) in other.edges.iter() {

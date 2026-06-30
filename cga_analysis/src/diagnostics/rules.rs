@@ -49,10 +49,7 @@ impl LintRuleSet {
         }
 
         // Compute crate-based rule.
-        if self
-            .crate_
-            .contains(span_to_cratename(&use_.span, tcx).as_str())
-        {
+        if self.crate_.contains(span_to_cratename(&use_.span, tcx).as_str()) {
             return true;
         }
 

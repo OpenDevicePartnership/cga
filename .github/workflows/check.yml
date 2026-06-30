@@ -19,7 +19,7 @@ jobs:
     - name: Fetch dependencies
       run: cargo fetch --locked
     - name: Format check
-      run: cargo fmt --check
+      run: cargo fmt --all --check
     - name: Build
       run: |
         cargo build --locked

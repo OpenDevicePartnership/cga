@@ -22,10 +22,9 @@ pub(crate) fn dyn_object_call_to_impl_methods<'tcx>(
         .iter()
         .chain(trait_impls.non_blanket_impls().values().flatten())
         .filter_map(|impl_def_id| {
-            let Ok(impl_trait) = tcx.try_normalize_erasing_regions(
-                typing_env,
-                tcx.impl_trait_ref(*impl_def_id).instantiate_identity(),
-            ) else {
+            let Ok(impl_trait) =
+                tcx.try_normalize_erasing_regions(typing_env, tcx.impl_trait_ref(*impl_def_id).instantiate_identity())
+            else {
                 info!("Failed to normalize {impl_def_id:?}");
                 return None;
             };
@@ -40,24 +39,16 @@ pub(crate) fn dyn_object_call_to_impl_methods<'tcx>(
             let impl_args = GenericArgs::identity_for_item(tcx, *impl_def_id);
 
             // Get the type for thing having an impl for the trait.
-            let self_ty = tcx
-                .type_of(*impl_def_id)
-                .instantiate(tcx, impl_args)
-                .skip_norm_wip();
+            let self_ty = tcx.type_of(*impl_def_id).instantiate(tcx, impl_args).skip_norm_wip();
 
             // Replace dyn binder Self with a concrete Self of the type of self_ty.
             // Without this replacement a &dyn would be passed to the function, but it expects &self.
             let trait_args = tcx.mk_args_from_iter(
-                std::iter::once(self_ty.into()).chain(
-                    GenericArgs::identity_for_item(tcx, virtual_def_id)
-                        .iter()
-                        .skip(1),
-                ),
+                std::iter::once(self_ty.into())
+                    .chain(GenericArgs::identity_for_item(tcx, virtual_def_id).iter().skip(1)),
             );
 
-            if let Ok(instance_opt) =
-                Instance::try_resolve(tcx, typing_env, virtual_def_id, trait_args)
-            {
+            if let Ok(instance_opt) = Instance::try_resolve(tcx, typing_env, virtual_def_id, trait_args) {
                 instance_opt
             } else {
                 None

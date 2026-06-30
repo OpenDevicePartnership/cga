@@ -18,15 +18,12 @@
 use rustc_data_structures::{graph::StartNode, unord::UnordSet};
 use rustc_hir::{CoroutineDesugaring, CoroutineKind, def_id::DefId};
 use rustc_log::tracing::*;
-use rustc_middle::mir::{
-    self, Body, CastKind, Location, Rvalue, Terminator, TerminatorKind, visit::Visitor as _,
-};
+use rustc_middle::mir::{self, Body, CastKind, Location, Rvalue, Terminator, TerminatorKind, visit::Visitor as _};
 use rustc_middle::mono::MonoItem;
 use rustc_middle::span_bug;
 use rustc_middle::ty::adjustment::PointerCoercion;
 use rustc_middle::ty::{
-    self, EarlyBinder, GenericArgsRef, Instance, InstanceKind, ShimKind, TyCtxt, TypeFoldable,
-    TypingEnv,
+    self, EarlyBinder, GenericArgsRef, Instance, InstanceKind, ShimKind, TyCtxt, TypeFoldable, TypingEnv,
 };
 use rustc_span::Span;
 use rustc_type_ir::CoroutineArgs;
@@ -47,10 +44,7 @@ struct PostMonoNode<'b, 'a, 'tcx> {
 }
 
 /// Analyse all used items recursively, starting from roots.
-pub fn generate_callgraph<'tcx>(
-    tcx: TyCtxt<'tcx>,
-    roots: UnordSet<MonoItem<'tcx>>,
-) -> Callgraph<'tcx> {
+pub fn generate_callgraph<'tcx>(tcx: TyCtxt<'tcx>, roots: UnordSet<MonoItem<'tcx>>) -> Callgraph<'tcx> {
     trace!("all roots: {roots:?}");
 
     let mut callgraph = Callgraph::new();
@@ -100,8 +94,7 @@ impl<'b, 'a, 'tcx> mir::visit::Visitor<'tcx> for PostMonoNode<'b, 'a, 'tcx> {
 
         if let TerminatorKind::Assert { .. } = terminator.kind {
             debug!("visit_terminator assert");
-            let use_ =
-                Use::for_location(UseKind::BuiltinMirAssert, self.body, terminator.source_info);
+            let use_ = Use::for_location(UseKind::BuiltinMirAssert, self.body, terminator.source_info);
             self.on_edge(use_);
         }
 
@@ -122,11 +115,7 @@ impl<'b, 'a, 'tcx> mir::visit::Visitor<'tcx> for PostMonoNode<'b, 'a, 'tcx> {
 impl<'b, 'a, 'tcx> PostMonoNode<'b, 'a, 'tcx> {
     fn find_dynamic_cast(&self, rval: &Rvalue<'tcx>) -> Option<(Span, UseKind<'tcx>)> {
         match rval {
-            Rvalue::Cast(
-                CastKind::PointerCoercion(PointerCoercion::ReifyFnPointer(_), _),
-                operand,
-                _fn_ptr_ty,
-            ) => {
+            Rvalue::Cast(CastKind::PointerCoercion(PointerCoercion::ReifyFnPointer(_), _), operand, _fn_ptr_ty) => {
                 let call_span = operand.span(self.body);
                 let Some((pre_mono_callee, generic_args)) = operand.const_fn_def() else {
                     span_bug!(
@@ -135,8 +124,7 @@ impl<'b, 'a, 'tcx> PostMonoNode<'b, 'a, 'tcx> {
                     );
                 };
 
-                let callee_instance =
-                    self.monomorphize_instance(pre_mono_callee, generic_args, call_span);
+                let callee_instance = self.monomorphize_instance(pre_mono_callee, generic_args, call_span);
 
                 Some((call_span, UseKind::FnPtrCast(callee_instance)))
             }
@@ -199,9 +187,7 @@ impl<'b, 'a, 'tcx> PostMonoNode<'b, 'a, 'tcx> {
             state: self.state,
         };
 
-        for method in
-            dyn_object_call_to_impl_methods(virtual_def_id, this.instance.args, this.state.tcx)
-        {
+        for method in dyn_object_call_to_impl_methods(virtual_def_id, this.instance.args, this.state.tcx) {
             // Add a 'fake' use to each of the VTable entries.
             this.on_edge(Use {
                 kind: UseKind::VTableCalled(method),
@@ -248,14 +234,9 @@ impl<'b, 'a, 'tcx> PostMonoNode<'b, 'a, 'tcx> {
         let body = state.tcx.instance_mir(instance.def);
         info!("instanced {instance:?}");
 
-        let mut this: PostMonoNode<'_, 'a, 'tcx> = PostMonoNode {
-            instance,
-            body,
-            state,
-        };
+        let mut this: PostMonoNode<'_, 'a, 'tcx> = PostMonoNode { instance, body, state };
 
-        if let Some(CoroutineKind::Desugared(CoroutineDesugaring::Async, _)) = body.coroutine_kind()
-        {
+        if let Some(CoroutineKind::Desugared(CoroutineDesugaring::Async, _)) = body.coroutine_kind() {
             // TODO this implementation block is fragile.
             debug!("visiting (async coroutine) {instance:#?} {body:#?}");
 
@@ -272,10 +253,8 @@ impl<'b, 'a, 'tcx> PostMonoNode<'b, 'a, 'tcx> {
             };
 
             for (value, bb) in targets.iter() {
-                const RETURNED: u128 =
-                    <CoroutineArgs<TyCtxt<'_>> as ty::CoroutineArgsExt>::RETURNED as u128;
-                const POISONED: u128 =
-                    <CoroutineArgs<TyCtxt<'_>> as ty::CoroutineArgsExt>::POISONED as u128;
+                const RETURNED: u128 = <CoroutineArgs<TyCtxt<'_>> as ty::CoroutineArgsExt>::RETURNED as u128;
+                const POISONED: u128 = <CoroutineArgs<TyCtxt<'_>> as ty::CoroutineArgsExt>::POISONED as u128;
 
                 match value {
                     RETURNED => {
@@ -333,8 +312,7 @@ impl<'b, 'a, 'tcx> PostMonoNode<'b, 'a, 'tcx> {
                 // If T is a function type, the compiler synthesizes an impl, so we'll check
                 // the trait declaration in libcore which isn't what we want. Check if the
                 // function is annotated instead.
-                if let InstanceKind::Shim(ShimKind::FnPtr(_, ty) | ShimKind::FnPtrAddr(_, ty)) =
-                    instance.def
+                if let InstanceKind::Shim(ShimKind::FnPtr(_, ty) | ShimKind::FnPtrAddr(_, ty)) = instance.def
                     && let ty::FnDef(fn_item, fn_args) = ty.kind()
                 {
                     debug!("found function item {fn_item:?}");
@@ -348,10 +326,7 @@ impl<'b, 'a, 'tcx> PostMonoNode<'b, 'a, 'tcx> {
             TerminatorKind::Drop { place, .. } => {
                 let (ty, _) = self.monomorphize_args(place.ty(self.body, tcx));
                 let instance = Instance::resolve_drop_glue(tcx, ty.ty);
-                if matches!(
-                    instance.def,
-                    InstanceKind::Shim(ShimKind::DropGlue(_, None))
-                ) {
+                if matches!(instance.def, InstanceKind::Shim(ShimKind::DropGlue(_, None))) {
                     debug!("ty `{ty:?}` does not need to be dropped");
                     return vec![];
                 }
@@ -368,12 +343,7 @@ impl<'b, 'a, 'tcx> PostMonoNode<'b, 'a, 'tcx> {
         )]
     }
 
-    fn monomorphize_instance(
-        &self,
-        def_id: DefId,
-        generic_args: GenericArgsRef<'tcx>,
-        span: Span,
-    ) -> Instance<'tcx> {
+    fn monomorphize_instance(&self, def_id: DefId, generic_args: GenericArgsRef<'tcx>, span: Span) -> Instance<'tcx> {
         info!(
             "monomorphize_instance {def_id:?} {generic_args:?} for {:?}",
             self.instance
@@ -389,11 +359,9 @@ impl<'b, 'a, 'tcx> PostMonoNode<'b, 'a, 'tcx> {
         let tcx = self.state.tcx;
 
         let env = TypingEnv::codegen(tcx, self.instance.def_id());
-        let args = self.instance.instantiate_mir_and_normalize_erasing_regions(
-            tcx,
-            env,
-            EarlyBinder::bind(tcx, generic_args),
-        );
+        let args =
+            self.instance
+                .instantiate_mir_and_normalize_erasing_regions(tcx, env, EarlyBinder::bind(tcx, generic_args));
 
         info!("monomorphize_args OK");
         (args, env)

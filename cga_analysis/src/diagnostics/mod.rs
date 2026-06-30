@@ -39,17 +39,14 @@ pub fn emit_lints<'tcx>(mut callgraph: Callgraph<'tcx>, config: &LintConfig, tcx
     let bigraph = BiCallgraph::from(&callgraph);
 
     // Compute all boundaries and leafs, and group them per span so that we have one lint per location.
-    let mut panic_boundaries: IndexMap<Span, IndexSet<BoundaryLeaf<'_, 'tcx>>> =
-        IndexMap::default();
-    let mut blacklist_boundaries: IndexMap<Span, IndexSet<BoundaryLeaf<'_, 'tcx>>> =
-        IndexMap::default();
+    let mut panic_boundaries: IndexMap<Span, IndexSet<BoundaryLeaf<'_, 'tcx>>> = IndexMap::default();
+    let mut blacklist_boundaries: IndexMap<Span, IndexSet<BoundaryLeaf<'_, 'tcx>>> = IndexMap::default();
 
     for Edge { use_: leaf, .. } in bigraph.edges() {
         if leaf.panic_status(tcx).any() {
             info!("Leaf {leaf:?}");
             bigraph.find_boundaries(leaf, tcx, |boundary| {
-                let root_span =
-                    rustc_span::hygiene::walk_chain(boundary.span, SyntaxContext::root());
+                let root_span = rustc_span::hygiene::walk_chain(boundary.span, SyntaxContext::root());
                 panic_boundaries
                     .entry(root_span)
                     .or_default()
@@ -59,8 +56,7 @@ pub fn emit_lints<'tcx>(mut callgraph: Callgraph<'tcx>, config: &LintConfig, tcx
 
         if blacklist.use_applies(leaf, tcx) {
             bigraph.find_boundaries(leaf, tcx, |boundary| {
-                let root_span =
-                    rustc_span::hygiene::walk_chain(boundary.span, SyntaxContext::root());
+                let root_span = rustc_span::hygiene::walk_chain(boundary.span, SyntaxContext::root());
                 blacklist_boundaries
                     .entry(root_span)
                     .or_default()
@@ -143,10 +139,7 @@ fn process_boundaries<'tcx, Engine: LintEngine>(
     for (span, boundary_leafs) in boundaries {
         info!("Boundary {span:?} {boundary_leafs:?}");
 
-        let all_leafs: IndexSet<_> = boundary_leafs
-            .iter()
-            .map(|bl| Node::from(bl.leaf))
-            .collect();
+        let all_leafs: IndexSet<_> = boundary_leafs.iter().map(|bl| Node::from(bl.leaf)).collect();
 
         let boundary_leafs = Engine::select(boundary_leafs, tcx);
         let boundaries: IndexSet<_> = boundary_leafs.iter().map(|bl| *bl.boundary).collect();
@@ -168,9 +161,7 @@ fn process_boundaries<'tcx, Engine: LintEngine>(
             )
             .unwrap();
 
-        if let (Some(root_last), Some(panic_first)) =
-            (path_from_root.last(), path_to_panics.first())
-        {
+        if let (Some(root_last), Some(panic_first)) = (path_from_root.last(), path_to_panics.first()) {
             assert_eq!(root_last.to, panic_first.from);
             info!("Path consecutive");
         } else {
@@ -266,9 +257,7 @@ fn decorate_leaf(use_: &Use<'_>, diag: &mut Diag<'_, ()>) {
 /// Decorate with extra notes if the boundary is not a straightforward function call
 fn decorate_cast(use_: &Use<'_>, diag: &mut Diag<'_, ()>) {
     if matches!(use_.kind, UseKind::FnPtrCast(..)) {
-        diag.note(
-            "once a function is cast to a function pointer, cga can no longer tell how it is used",
-        );
+        diag.note("once a function is cast to a function pointer, cga can no longer tell how it is used");
         diag.note("as a precaution, it must assume you will eventually call the function");
     }
 }
@@ -364,9 +353,7 @@ fn lint_use<Engine: LintEngine>(data: LintData<'_, '_>, tcx: TyCtxt<'_>) {
 
                                 format!("{instance_path} ({})", use_.descriptor())
                             }
-                            UseKind::BuiltinMirAssert | UseKind::AsyncPanic => {
-                                use_.descriptor().to_string()
-                            }
+                            UseKind::BuiltinMirAssert | UseKind::AsyncPanic => use_.descriptor().to_string(),
                         };
                         let is_boundary = use_ == &boundary_use;
 

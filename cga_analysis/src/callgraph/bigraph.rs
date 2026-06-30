@@ -84,12 +84,7 @@ impl<'tcx> BiCallgraph<'tcx> {
     }
 
     /// Find all the crate boundaries from a leaf node.
-    pub fn find_boundaries<'a>(
-        &'a self,
-        leaf: &'a Use<'tcx>,
-        tcx: TyCtxt<'tcx>,
-        mut f: impl FnMut(&'a Use<'tcx>),
-    ) {
+    pub fn find_boundaries<'a>(&'a self, leaf: &'a Use<'tcx>, tcx: TyCtxt<'tcx>, mut f: impl FnMut(&'a Use<'tcx>)) {
         fn visit_node<'a, 'tcx>(
             this: &'a BiCallgraph<'tcx>,
             to: Node<'tcx>,
@@ -132,14 +127,11 @@ impl<'tcx> BiCallgraph<'tcx> {
         }
     }
 
-    pub fn find_shortest_from_roots(
-        &self,
-        boundaries: &IndexSet<Use<'tcx>>,
-    ) -> Option<Vec<Edge<'tcx>>> {
+    pub fn find_shortest_from_roots(&self, boundaries: &IndexSet<Use<'tcx>>) -> Option<Vec<Edge<'tcx>>> {
         for e in self.edges() {
             if boundaries.contains(&e.use_)
-                && let Some(mut trace) = self
-                    .bfs_bidirectional(std::iter::once(Node::Entrypoint), std::iter::once(e.from))
+                && let Some(mut trace) =
+                    self.bfs_bidirectional(std::iter::once(Node::Entrypoint), std::iter::once(e.from))
             {
                 trace.push(*e);
                 return Some(trace);
@@ -166,11 +158,7 @@ impl<'tcx> BiCallgraph<'tcx> {
         )
     }
 
-    pub fn count_paths_to_leafs(
-        &self,
-        boundary: Node<'tcx>,
-        leafs: &IndexSet<Node<'tcx>>,
-    ) -> usize {
+    pub fn count_paths_to_leafs(&self, boundary: Node<'tcx>, leafs: &IndexSet<Node<'tcx>>) -> usize {
         cached_count_paths(
             boundary,
             leafs,
@@ -181,17 +169,11 @@ impl<'tcx> BiCallgraph<'tcx> {
     }
 
     fn successors(&self, node: Node<'tcx>) -> impl Iterator<Item = &Edge<'tcx>> {
-        self.edges
-            .get(&node)
-            .into_iter()
-            .flat_map(|edges| edges.iter())
+        self.edges.get(&node).into_iter().flat_map(|edges| edges.iter())
     }
 
     fn predecessors(&self, node: Node<'tcx>) -> impl Iterator<Item = &Edge<'tcx>> {
-        self.rev_edges
-            .get(&node)
-            .into_iter()
-            .flat_map(|edges| edges.iter())
+        self.rev_edges.get(&node).into_iter().flat_map(|edges| edges.iter())
     }
 
     /// Bidirectional Breadth First Search
@@ -207,10 +189,7 @@ impl<'tcx> BiCallgraph<'tcx> {
         let mut successors: IndexMap<Node<'tcx>, Option<usize>> = IndexMap::default();
         successors.extend(ends.map(|n| (n, None)));
 
-        if predecessors
-            .keys()
-            .any(|node| successors.contains_key(node))
-        {
+        if predecessors.keys().any(|node| successors.contains_key(node)) {
             return Some(vec![]); // We are already here.
         }
 

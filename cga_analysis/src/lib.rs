@@ -173,7 +173,5 @@ pub(crate) fn canonical_path(instance: &Instance<'_>) -> String {
 }
 
 pub(crate) fn simplified_path(instance: &Instance<'_>) -> String {
-    with_resolve_crate_name!(rustc_middle::ty::tls::with(
-        |tcx| tcx.def_path_str(instance.def_id())
-    ))
+    with_resolve_crate_name!(rustc_middle::ty::tls::with(|tcx| tcx.def_path_str(instance.def_id())))
 }

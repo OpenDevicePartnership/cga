@@ -156,9 +156,11 @@ pub fn exec(opts: Opts) -> ExitStatus {
             }
         }
 
-        let callgraph = Callgraph::merge(emissions.iter().map(|e| {
-            serde_json::from_reader::<_, Callgraph>(BufReader::new(File::open(e).unwrap())).unwrap()
-        }));
+        let callgraph = Callgraph::merge(
+            emissions
+                .iter()
+                .map(|e| serde_json::from_reader::<_, Callgraph>(BufReader::new(File::open(e).unwrap())).unwrap()),
+        );
 
         let file = BufWriter::new(File::create(output_path).unwrap());
 
