@@ -1,4 +1,332 @@
 
 # cargo-vet audits file
 
-[audits]
+[[audits.annotate-snippets]]
+who = "Jerry Xie <jerryxie@microsoft.com>"
+criteria = "safe-to-run"
+version = "0.11.5"
+notes = "Full audit: no unsafe, no build.rs/proc-macros, no fs/net/process/env access; pure in-memory snippet rendering with anstyle/unicode-width/memchr. Assisted-by: copilot-cli:claude-opus-4.8 cargo-vet"
+
+[[audits.anstream]]
+who = "Jerry Xie <jerryxie@microsoft.com>"
+criteria = "safe-to-deploy"
+version = "1.0.0"
+notes = "Full audit: ANSI stream adapters; no build script (build=false)/proc-macros, no fs/net/process/env; sole unsafe from_utf8_unchecked is sound (str-only callers, UTF-8-preserving parser, debug-checked). Assisted-by: copilot-cli:claude-opus-4.8 cargo-vet"
+
+[[audits.anstyle]]
+who = "Jerry Xie <jerryxie@microsoft.com>"
+criteria = "safe-to-deploy"
+version = "1.0.14"
+notes = "Full audit: no_std ANSI styling types; no build script/proc-macros, no fs/net/process/env/FFI, zero runtime deps; single unsafe from_utf8_unchecked is sound (buffer only ever holds ASCII digits and valid static str). Assisted-by: copilot-cli:claude-opus-4.8 cargo-vet"
+
+[[audits.anstyle-parse]]
+who = "Jerry Xie <jerryxie@microsoft.com>"
+criteria = "safe-to-deploy"
+version = "1.0.0"
+notes = "Full audit: no_std in-memory ANSI/VT escape parser; no build script/proc-macros, no fs/net/process/env. Three sound unsafe blocks: u8->State/Action transmutes guarded by 4-bit mask over repr(u8) enums with exactly 16 variants, and MaybeUninit osc-slice array pattern exposing only initialized prefix. Assisted-by: copilot-cli:claude-opus-4.8 cargo-vet"
+
+[[audits.anstyle-query]]
+who = "Jerry Xie <jerryxie@microsoft.com>"
+criteria = "safe-to-deploy"
+version = "1.1.5"
+notes = "Full audit: single sound unsafe block wrapping Windows GetConsoleMode/SetConsoleMode FFI (handles from std stdio, null-checked); no build script/proc-macros; only read-only std::env terminal-capability queries. Assisted-by: copilot-cli:claude-opus-4.8 cargo-vet"
+
+[[audits.anstyle-wincon]]
+who = "Jerry Xie <jerryxie@microsoft.com>"
+criteria = "safe-to-deploy"
+version = "3.0.11"
+notes = "Full audit: Windows console color styling. Two unsafe FFI blocks (GetConsoleScreenBufferInfo/SetConsoleTextAttribute) sound: null-checked handles from live borrows, zeroed POD struct, checked returns; no build script, no proc-macros, no fs/net/process/env beyond windows-sys console FFI. Assisted-by: copilot-cli:claude-opus-4.8 cargo-vet"
+
+[[audits.anyhow]]
+who = "Jerry Xie <jerryxie@microsoft.com>"
+criteria = "safe-to-deploy"
+delta = "1.0.102 -> 1.0.103"
+notes = "Delta 1.0.102->1.0.103: refactors downcast unsafe code to use ptr::addr_of! field projection + NonNull/Ref::from_raw (soundness hardening, enables downcast_mut); no new deps, no new ambient capabilities, build.rs unchanged. Assisted-by: copilot-cli:claude-opus-4.8 cargo-vet"
+
+[[audits.backtrace]]
+who = "Jerry Xie <jerryxie@microsoft.com>"
+criteria = "safe-to-run"
+delta = "0.3.75 -> 0.3.76"
+notes = "Delta 0.3.75->0.3.76: dep bumps (cpp_demangle 0.5, object 0.37, addr2line 0.25, ruzstd 0.8, windows-targets->windows-link), no build script/proc-macros, no new fs/net/process/env. All unsafe changes are reductions/soundness fixes (safe static Mutex, object::pod parsing replaces transmute, MaybeUninit padding fix). Assisted-by: copilot-cli:claude-opus-4.8 cargo-vet"
+
+[[audits.bstr]]
+who = "Jerry Xie <jerryxie@microsoft.com>"
+criteria = "safe-to-run"
+delta = "1.12.1 -> 1.12.3"
+notes = "Delta 1.12.1->1.12.3: MSRV 1.73->1.65, optional serde->serde_core dep swap, doc/must_use attrs, and a safe ASCII-fast-path Chars::count() override; no new unsafe, no build script/proc-macros, no fs/net/process/env. Assisted-by: copilot-cli:claude-opus-4.8 cargo-vet"
+
+[[audits.camino]]
+who = "Jerry Xie <jerryxie@microsoft.com>"
+criteria = "safe-to-run"
+delta = "1.2.3 -> 1.2.4"
+notes = "Delta 1.2.3->1.2.4: adds Box<Path><->Box<Utf8Path> conversions + FromBoxedPathError; new unsafe Box::from_raw transmutes sound via repr(transparent), UTF-8 validated before Path->Utf8Path reinterpret; no build script/proc-macros, no new fs/net/process/env. Assisted-by: copilot-cli:claude-opus-4.8 cargo-vet"
+
+[[audits.cargo-platform]]
+who = "Jerry Xie <jerryxie@microsoft.com>"
+criteria = "safe-to-run"
+delta = "0.1.3 -> 0.3.1"
+notes = "Delta 0.1.3->0.3.1: pure cfg() parser/matcher changes (raw idents, true/false literals, keyword-deprecation warnings, edition 2024). No unsafe, no build.rs (build=false), no proc-macros, no fs/net/process/env in lib. Assisted-by: copilot-cli:claude-opus-4.8 cargo-vet"
+
+[[audits.cargo_metadata]]
+who = "Jerry Xie <jerryxie@microsoft.com>"
+criteria = "safe-to-run"
+delta = "0.15.3 -> 0.23.1"
+notes = "Delta 0.15.3->0.23.1: no unsafe, no build script, no proc macros; only expected std::process/std::env use to invoke 'cargo metadata'. New API (env_remove, newtype/enum wrappers) consistent with advertised purpose. Assisted-by: copilot-cli:claude-opus-4.8 cargo-vet"
+
+[[audits.clap]]
+who = "Jerry Xie <jerryxie@microsoft.com>"
+criteria = "safe-to-deploy"
+delta = "4.5.20 -> 4.6.1"
+notes = "Delta 4.5.20->4.6.1 is docs/examples/tutorials plus a new _concepts doc module and docsrs attr swap; forbid(unsafe_code) retained, no build.rs/proc-macros/fs/net/process additions. Assisted-by: copilot-cli:claude-opus-4.8 cargo-vet"
+
+[[audits.clap_builder]]
+who = "Jerry Xie <jerryxie@microsoft.com>"
+criteria = "safe-to-deploy"
+delta = "4.5.18 -> 4.5.20"
+notes = "Delta 4.5.18->4.5.20: doc/typo fixes, internal AppTag->AppExt rename, unstable-ext CommandExt API, dep bumps; no unsafe, build, or ambient capabilities. Assisted-by: copilot-cli:claude-opus-4.8 cargo-vet"
+
+[[audits.clap_builder]]
+who = "Jerry Xie <jerryxie@microsoft.com>"
+criteria = "safe-to-deploy"
+delta = "4.5.20 -> 4.6.0"
+notes = "Delta 4.5.20->4.6.0: doc reformatting, edition 2024/MSRV 1.85 + dep bumps, new default_values_if API, parser/validator refactor; forbid(unsafe_code) retained, no build script, no new fs/net/process. Assisted-by: copilot-cli:claude-opus-4.8 cargo-vet"
+
+[[audits.clap_derive]]
+who = "Jerry Xie <jerryxie@microsoft.com>"
+criteria = "safe-to-deploy"
+version = "4.6.1"
+notes = "Full audit: clap Parser/Args/Subcommand/ValueEnum derive proc-macro; forbid(unsafe_code), no build.rs, no fs/net/process; only env reads are hard-coded CARGO_PKG_* metadata at expansion; generated code is plain clap builder calls. Assisted-by: copilot-cli:claude-opus-4.8 cargo-vet"
+
+[[audits.clap_lex]]
+who = "Jerry Xie <jerryxie@microsoft.com>"
+criteria = "safe-to-deploy"
+version = "1.1.0"
+notes = "Full audit: minimal in-memory arg lexer; no build script/proc-macros, no fs/net/process/env; unsafe limited to sound OsStr as_encoded_bytes/from_encoded_bytes_unchecked at UTF-8 boundaries with valid callers. Assisted-by: copilot-cli:claude-opus-4.8 cargo-vet"
+
+[[audits.color-eyre]]
+who = "Jerry Xie <jerryxie@microsoft.com>"
+criteria = "safe-to-run"
+version = "0.6.5"
+notes = "Full audit: no unsafe, no build.rs/proc-macros, no net/process; only read-only fs access (source snippets) and read-only RUST_BACKTRACE/SPANTRACE env reads, consistent with advertised colorful error reporting. Assisted-by: copilot-cli:claude-opus-4.8 cargo-vet"
+
+[[audits.color-spantrace]]
+who = "Jerry Xie <jerryxie@microsoft.com>"
+criteria = "safe-to-run"
+version = "0.3.0"
+notes = "Full audit: no unsafe; build.rs only runs rustc --version for toolchain cfg; runtime fs reads are read-only source-snippet display gated by RUST_BACKTRACE; behavior matches advertised SpanTrace pretty-printer. Assisted-by: copilot-cli:claude-opus-4.8 cargo-vet"
+
+[[audits.colorchoice]]
+who = "Jerry Xie <jerryxie@microsoft.com>"
+criteria = "safe-to-deploy"
+version = "1.0.5"
+notes = "Full audit: single-file no_std crate, no unsafe, no build script/proc-macros, zero deps, no fs/net/process/env; only core atomic state for global ColorChoice override. Assisted-by: copilot-cli:claude-opus-4.8 cargo-vet"
+
+[[audits.colored]]
+who = "Jerry Xie <jerryxie@microsoft.com>"
+criteria = "safe-to-run"
+delta = "2.0.4 -> 3.1.1"
+notes = "Delta 2.0.4->3.1.1: additive style trait impls + tests; swapped lazy_static/is_terminal for std LazyLock/IsTerminal; only unsafe is unchanged Windows console FFI; reads only color env vars; no build.rs/proc-macros/net/fs. Assisted-by: copilot-cli:claude-opus-4.8 cargo-vet"
+
+[[audits.comma]]
+who = "Jerry Xie <jerryxie@microsoft.com>"
+criteria = "safe-to-run"
+version = "1.0.0"
+notes = "Full audit: pure-Rust shell-style string tokenizer; no unsafe, no build.rs/proc-macros, no deps, only std iter/str imports, no fs/net/process/env access. Assisted-by: copilot-cli:claude-opus-4.8 cargo-vet"
+
+[[audits.crossbeam-utils]]
+who = "Jerry Xie <jerryxie@microsoft.com>"
+criteria = "safe-to-run"
+delta = "0.8.15 -> 0.8.14"
+notes = "Delta (downgrade): only CHANGELOG/version, build-script target-list data, a clippy lint attr, a park_timeout overflow-handling tweak, doc comment, and a test differ; no unsafe code, build-script logic, or fs/net/process/env changes. Assisted-by: copilot-cli:claude-opus-4.8 cargo-vet"
+
+[[audits.eyre]]
+who = "Jerry Xie <jerryxie@microsoft.com>"
+criteria = "safe-to-run"
+version = "0.6.12"
+notes = "Full audit: no proc-macros; build.rs only probes rustc features (writes OUT_DIR, runs rustc); runtime has no fs/net/process/env; unsafe is sound anyhow-style repr(C) type-erasure vtable and TypeId-guarded Any downcasts. Assisted-by: copilot-cli:claude-opus-4.8 cargo-vet"
+
+[[audits.indenter]]
+who = "Jerry Xie <jerryxie@microsoft.com>"
+criteria = "safe-to-run"
+version = "0.3.4"
+notes = "Full audit: pure-safe-Rust fmt::Write indentation adapter; no unsafe, no build.rs/proc-macro, no deps, no fs/net/process/env access. Assisted-by: copilot-cli:claude-opus-4.8 cargo-vet"
+
+[[audits.is_terminal_polyfill]]
+who = "Jerry Xie <jerryxie@microsoft.com>"
+criteria = "safe-to-deploy"
+version = "1.70.2"
+notes = "Full audit: trivial 58-line polyfill forwarding to std::io::IsTerminal; no unsafe, no build script (build=false), no proc-macros, no deps, no fs/net/process/env access. Assisted-by: copilot-cli:claude-opus-4.8 cargo-vet"
+
+[[audits.itertools]]
+who = "Jerry Xie <jerryxie@microsoft.com>"
+criteria = "safe-to-deploy"
+delta = "0.14.0 -> 0.15.0"
+notes = "Delta 0.14.0->0.15.0 adds array-combination & with_hasher adaptors, AllEqualValueError, strip_prefix, and formatting modernization; no unsafe, no build.rs/proc-macros, no fs/net/process/env or new runtime deps; pure iterator-adaptor behavior. Assisted-by: copilot-cli:claude-opus-4.8 cargo-vet"
+
+[[audits.lazy-regex]]
+who = "Jerry Xie <jerryxie@microsoft.com>"
+criteria = "safe-to-deploy"
+version = "3.6.0"
+notes = "Full audit: no unsafe, no build.rs, no fs/net/process/env. Macros validate patterns at compile time via regex::Regex::new and emit safe once_cell Lazy RegexBuilder code; remove.rs uses only safe slicing at regex match boundaries. Assisted-by: copilot-cli:claude-opus-4.8 cargo-vet"
+
+[[audits.lazy-regex-proc_macros]]
+who = "Jerry Xie <jerryxie@microsoft.com>"
+criteria = "safe-to-deploy"
+version = "3.6.0"
+notes = "Full audit: no unsafe, no build script, no fs/net/process/env. Proc macro validates regex literals in-memory (regex::Regex::new) and emits predictable lazy-static regex builder code; user exprs passed through verbatim, no code injection. Assisted-by: copilot-cli:claude-opus-4.8 cargo-vet"
+
+[[audits.levenshtein]]
+who = "Jerry Xie <jerryxie@microsoft.com>"
+criteria = "safe-to-run"
+version = "1.0.5"
+notes = "Full audit: single pure function computing Levenshtein edit distance; no unsafe, no build script, no deps, no fs/net/process/env access. Assisted-by: copilot-cli:claude-opus-4.8 cargo-vet"
+
+[[audits.libc]]
+who = "Jerry Xie <jerryxie@microsoft.com>"
+criteria = "safe-to-run"
+delta = "0.2.177 -> 0.2.186"
+notes = "Delta 0.2.177->0.2.186: bindings-only (constants, structs, externs) plus new src/new module tree; build.rs only reads env vars and emits cfgs; macros generate plain repr(C) bindings; no new deps, fs, net, or process access. Assisted-by: copilot-cli:claude-opus-4.8 cargo-vet"
+
+[[audits.log]]
+who = "Jerry Xie <jerryxie@microsoft.com>"
+criteria = "safe-to-deploy"
+delta = "0.4.32 -> 0.4.33"
+notes = "Delta 0.4.32->0.4.33: key-comparison bugfix replacing derived Eq/Ord/Hash on MaybeStaticStr with content-based impls; no unsafe, no build/proc-macro, no new powerful imports. Assisted-by: copilot-cli:claude-opus-4.8 cargo-vet"
+
+[[audits.memchr]]
+who = "Jerry Xie <jerryxie@microsoft.com>"
+criteria = "safe-to-deploy"
+delta = "2.8.1 -> 2.8.2"
+notes = "Delta 2.8.1->2.8.2: fixes pointer-arithmetic UB in packedpair search (out-of-bounds end.sub replaced with sound end.distance comparison), adds Miri regression test, minor into_owned move-vs-clone. No new deps/build scripts/imports. Assisted-by: copilot-cli:claude-opus-4.8 cargo-vet"
+
+[[audits.object]]
+who = "Jerry Xie <jerryxie@microsoft.com>"
+criteria = "safe-to-run"
+delta = "0.36.7 -> 0.36.5"
+notes = "Delta 0.36.7->0.36.5: removes Relr/M68k support, no_std core::error impl and a benign rustc-version-probe build.rs; only unsafe change is removing Relr POD impls (sound repr(C) pattern); no fs/net/process in lib. Assisted-by: copilot-cli:claude-opus-4.8 cargo-vet"
+
+[[audits.once_cell_polyfill]]
+who = "Jerry Xie <jerryxie@microsoft.com>"
+criteria = "safe-to-deploy"
+version = "1.70.2"
+notes = "Full audit: ~54 LOC newtype wrapper forwarding to std::sync::OnceLock; no unsafe, no build.rs (build=false), no proc-macros, no deps, no fs/net/process/env/FFI. Assisted-by: copilot-cli:claude-opus-4.8 cargo-vet"
+
+[[audits.owo-colors]]
+who = "Jerry Xie <jerryxie@microsoft.com>"
+criteria = "safe-to-run"
+version = "4.3.0"
+notes = "Full audit: forbid(unsafe_code), no unsafe/fs/net; build.rs only runs rustc --version for cfg detection; color detection delegated to optional supports-color dep. Assisted-by: copilot-cli:claude-opus-4.8 cargo-vet"
+
+[[audits.prettydiff]]
+who = "Jerry Xie <jerryxie@microsoft.com>"
+criteria = "safe-to-run"
+version = "0.9.0"
+notes = "Full audit: no unsafe, no build.rs/proc-macros, no fs/net/process/env access; pure LCS diff/pretty-print logic using std fmt/cmp + owo-colors/prettytable. Assisted-by: copilot-cli:claude-opus-4.8 cargo-vet"
+
+[[audits.quote]]
+who = "Jerry Xie <jerryxie@microsoft.com>"
+criteria = "safe-to-deploy"
+delta = "1.0.45 -> 1.0.46"
+notes = "Delta 1.0.45->1.0.46: quote_spanned! macro refactor (single span eval) + import reordering; no unsafe, no build.rs/dep changes, no new ambient capabilities. Assisted-by: copilot-cli:claude-opus-4.8 cargo-vet"
+
+[[audits.regex]]
+who = "Jerry Xie <jerryxie@microsoft.com>"
+criteria = "safe-to-deploy"
+delta = "1.12.3 -> 1.12.4"
+notes = "Delta 1.12.3->1.12.4 is metadata-only (CHANGELOG, version bump, added benches/ to include, regex-syntax dep 0.8.5->0.8.11); no source, unsafe, build, or capability changes. Assisted-by: copilot-cli:claude-opus-4.8 cargo-vet"
+
+[[audits.rustc-demangle]]
+who = "Jerry Xie <jerryxie@microsoft.com>"
+criteria = "safe-to-run"
+delta = "0.1.25 -> 0.1.26"
+notes = "Delta 0.1.25->0.1.26 adds v0 pattern-type demangling (print_pat, W tag) plus CHANGELOG/CI files; no unsafe, no build script, no fs/net/process/env access; behavior matches symbol-demangling purpose. Assisted-by: copilot-cli:claude-opus-4.8 cargo-vet"
+
+[[audits.rustc-demangle]]
+who = "Jerry Xie <jerryxie@microsoft.com>"
+criteria = "safe-to-run"
+delta = "0.1.26 -> 0.1.27"
+notes = "Delta 0.1.26->0.1.27: adds v0 demangling of trait-object assoc-const bindings plus a test; no unsafe, no build script/proc-macros, no fs/net/process/env. Assisted-by: copilot-cli:claude-opus-4.8 cargo-vet"
+
+[[audits.rustfix]]
+who = "Jerry Xie <jerryxie@microsoft.com>"
+criteria = "safe-to-run"
+version = "0.8.7"
+notes = "Full audit: no unsafe, no build.rs/proc-macros, no fs/net/process/env access; purely in-memory string/byte replacement of rustc JSON suggestions, matches advertised purpose (rust-lang authored). Assisted-by: copilot-cli:claude-opus-4.8 cargo-vet"
+
+[[audits.serde_json]]
+who = "Jerry Xie <jerryxie@microsoft.com>"
+criteria = "safe-to-deploy"
+delta = "1.0.149 -> 1.0.150"
+notes = "Delta 1.0.149->1.0.150: no unsafe/build/proc-macro/ambient-capability changes; hardens enum variant key parsing (issue979) plus cosmetic refactors and version bumps. Assisted-by: copilot-cli:claude-opus-4.8 cargo-vet"
+
+[[audits.serde_spanned]]
+who = "Jerry Xie <jerryxie@microsoft.com>"
+criteria = "safe-to-deploy"
+delta = "1.0.4 -> 1.1.1"
+notes = "Delta 1.0.4->1.1.1 is edition 2024 migration: manifest/edition/rust-version bumps, serde_core 1.0.225->1.0.228, one cosmetic import reorder; no logic, unsafe, build script, or new capabilities. Assisted-by: copilot-cli:claude-opus-4.8 cargo-vet"
+
+[[audits.spanned]]
+who = "Jerry Xie <jerryxie@microsoft.com>"
+criteria = "safe-to-run"
+version = "0.4.1"
+notes = "Full audit: one sound unsafe offset_from over same-allocation bstr line subslices; no build script or proc macros; only read-only std::fs file reads consistent with span-tracking purpose; no net/process/env. Assisted-by: copilot-cli:claude-opus-4.8 cargo-vet"
+
+[[audits.syn]]
+who = "Jerry Xie <jerryxie@microsoft.com>"
+criteria = "safe-to-deploy"
+delta = "2.0.117 -> 2.0.118"
+notes = "Delta 2.0.117->2.0.118: no unsafe, no build.rs, no new ambient capabilities; src changes are doc comments, version bump, and a semantically-equivalent bool-literal parse refactor plus lint-allow additions; remaining changes tests/benches only. Assisted-by: copilot-cli:claude-opus-4.8 cargo-vet"
+
+[[audits.thiserror]]
+who = "Jerry Xie <jerryxie@microsoft.com>"
+criteria = "safe-to-run"
+delta = "1.0.68 -> 1.0.69"
+notes = "Delta 1.0.68->1.0.69: version bump only - html_root_url + Cargo.toml version/dep pin + one UI test; no unsafe, no build.rs change, no new fs/net/process/env. Assisted-by: copilot-cli:claude-opus-4.8 cargo-vet"
+
+[[audits.thiserror-impl]]
+who = "Jerry Xie <jerryxie@microsoft.com>"
+criteria = "safe-to-run"
+delta = "1.0.68 -> 1.0.69"
+notes = "Delta 1.0.68->1.0.69: version bump plus one syn parser-progress fix in fmt.rs (consume unmatched TokenTree); no unsafe, no build script, no fs/net/process/env. Assisted-by: copilot-cli:claude-opus-4.8 cargo-vet"
+
+[[audits.toml]]
+who = "Jerry Xie <jerryxie@microsoft.com>"
+criteria = "safe-to-deploy"
+delta = "0.8.23 -> 1.1.2+spec-1.1.0"
+notes = "Delta 0.8.23->1.1.2+spec-1.1.0: major rearchitecture to in-house toml_parser/toml_writer + no_std; forbid(unsafe_code), no build script/proc-macros, no fs/net/process/env; pure TOML parse/serialize. Assisted-by: copilot-cli:claude-opus-4.8 cargo-vet"
+
+[[audits.toml_datetime]]
+who = "Jerry Xie <jerryxie@microsoft.com>"
+criteria = "safe-to-deploy"
+delta = "0.7.5+spec-1.1.0 -> 1.1.1+spec-1.1.0"
+notes = "Delta: pure logic changes making Time::second/nanosecond optional plus edition/MSRV/dep-version bumps; no unsafe, no build script, no proc macros, no new powerful imports; bounds checks preserved. Assisted-by: copilot-cli:claude-opus-4.8 cargo-vet"
+
+[[audits.toml_parser]]
+who = "Jerry Xie <jerryxie@microsoft.com>"
+criteria = "safe-to-deploy"
+version = "1.1.2+spec-1.1.0"
+notes = "Full audit: no_std TOML lexer/parser; no build script/proc-macros, no fs/net/process/env. forbid(unsafe_code) by default; all unsafe gated behind non-default unsafe feature with safe fallbacks and sound UTF-8-boundary get_unchecked/next_slice_unchecked. Assisted-by: copilot-cli:claude-opus-4.8 cargo-vet"
+
+[[audits.toml_writer]]
+who = "Jerry Xie <jerryxie@microsoft.com>"
+criteria = "safe-to-deploy"
+delta = "1.0.6+spec-1.1.0 -> 1.1.1+spec-1.1.0"
+notes = "Delta 1.0.6->1.1.1: metadata-only (edition 2024, MSRV 1.85, dev-dep + clippy-lint bumps); no source, unsafe, build-script, or runtime-dependency changes. Assisted-by: copilot-cli:claude-opus-4.8 cargo-vet"
+
+[[audits.tracing-error]]
+who = "Jerry Xie <jerryxie@microsoft.com>"
+criteria = "safe-to-run"
+version = "0.2.1"
+notes = "Full audit: no build.rs/proc-macros, no fs/net/process/env access; unsafe limited to sound anyhow-style type-erasure vtable and standard Layer::downcast_raw. Assisted-by: copilot-cli:claude-opus-4.8 cargo-vet"
+
+[[audits.ui_test]]
+who = "Jerry Xie <jerryxie@microsoft.com>"
+criteria = "safe-to-run"
+version = "0.30.7"
+notes = "Full audit: no build.rs/proc-macros, no network access; only unsafe is inside test-program string fixtures (not crate code). process/fs/env usage limited to invoking rustc/cargo and the harness's own test binaries and standard CARGO/RUSTC/GITHUB env vars - consistent with a UI test harness. Assisted-by: copilot-cli:claude-opus-4.8 cargo-vet"
+
+[[audits.winnow]]
+who = "Jerry Xie <jerryxie@microsoft.com>"
+criteria = "safe-to-deploy"
+delta = "0.7.15 -> 1.0.3"
+notes = "Delta 0.7.15->1.0.3: 1.0 API cleanup. No build script, no proc macros, no fs/net/process/env. Net unsafe reduction: two from_utf8_unchecked replaced with safe checked from_utf8. Behavior matches parser-combinator purpose. Assisted-by: copilot-cli:claude-opus-4.8 cargo-vet"
