@@ -1,0 +1,4 @@
+[alias]
+bless = "test --config env.RUSTC_BLESS='1'"
+uitest = "test --test compile-test"
+uibless = "bless --test compile-test"

@@ -1,0 +1,76 @@
+error: call to associated function `std::process::Command::new` which can panic
+ --> src/main.rs:7:13
+  |
+7 |     let _ = std::process::Command::new("evil");
+  |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: 14 different panics from this location
+  = note: backtrace (1 of 3843059837):
+          0: std::rt::panic_fmt (called)
+          1: alloc::raw_vec::RawVec::<u8>::into_box (called)
+          2: std::vec::Vec::<u8>::into_boxed_slice (called)
+          3: <std::boxed::Box<[u8]> as std::clone::Clone>::clone (called)
+          4: <std::ffi::CString as std::clone::Clone>::clone (called)
+          5: std::sys::process::unix::common::Command::new (called)
+          6: std::process::Command::new::<&str> (called) <--
+          7: fail_blacklist::test (called)
+          8: fail_blacklist::main (entrypoint)
+  = note: `#[deny(cga::panics)]` on by default
+
+error: call to drop of `std::process::Command` which can panic
+ --> src/main.rs:7:47
+  |
+7 |     let _ = std::process::Command::new("evil");
+  |                                               ^
+  |
+  = note: 14 different panics from this location
+  = note: backtrace (1 of 3843090268):
+          0: core::panicking::panic_nounwind_fmt (called)
+          1: <usize as std::slice::SliceIndex<[T]>>::get_unchecked_mut::precondition_check (called)
+          2: <usize as std::slice::SliceIndex<[u8]>>::get_unchecked_mut (called)
+          3: core::slice::<impl [u8]>::get_unchecked_mut::<usize> (called)
+          4: <std::ffi::CString as std::ops::Drop>::drop (called)
+          5: drop of `std::ffi::CString` (called)
+          6: drop of `std::sys::process::unix::common::Command` (called)
+          7: drop of `std::process::Command` (called) <--
+          8: fail_blacklist::test (called)
+          9: fail_blacklist::main (entrypoint)
+
+error: call to associated function `std::process::Command::new` which is blacklisted
+ --> src/main.rs:7:13
+  |
+7 |     let _ = std::process::Command::new("evil");
+  |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: 104 different blacklisted functions from this location
+  = note: backtrace:
+          0: std::process::Command::new::<&str> (called) <--
+          1: fail_blacklist::test (called)
+          2: fail_blacklist::main (entrypoint)
+note: the lint level is defined here
+ --> src/main.rs:3:11
+  |
+3 | #![forbid(cga::blacklisted)]
+  |           ^^^^^^^^^^^^^^^^
+
+error: call to drop of `std::process::Command` which can call blacklisted functions
+ --> src/main.rs:7:47
+  |
+7 |     let _ = std::process::Command::new("evil");
+  |                                               ^
+  |
+  = note: 105 different blacklisted functions from this location
+  = note: backtrace (1 of 42160433):
+          0: std::sys::fs::unix::debug_assert_fd_is_open (called)
+          1: <std::os::fd::OwnedFd as std::ops::Drop>::drop (called)
+          2: drop of `std::os::fd::OwnedFd` (called)
+          3: drop of `std::sys::fd::unix::FileDesc` (called)
+          4: drop of `std::sys::process::unix::common::Stdio` (called)
+          5: drop of `std::option::Option<std::sys::process::unix::common::Stdio>` (called)
+          6: drop of `std::sys::process::unix::common::Command` (called)
+          7: drop of `std::process::Command` (called) <--
+          8: fail_blacklist::test (called)
+          9: fail_blacklist::main (entrypoint)
+
+error: could not compile `fail-blacklist` (bin "fail-blacklist") due to 4 previous errors
+Error: 101

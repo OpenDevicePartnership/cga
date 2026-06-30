@@ -1,0 +1,16 @@
+error: call to function `core::panicking::panic` which is a panic
+  --> tests/ui/assert_macro.rs:6:5
+   |
+LL |     assert!(false);
+   |     ^^^^^^^^^^^^^^ expanded from here
+   |
+   = note: 4 different panics from this location
+   = note: backtrace:
+           0: core::panicking::panic (called) <--
+           1: assert_macro::test (called)
+           2: assert_macro::main (entrypoint)
+   = note: `-D cga::panics` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(cga::panics)]`
+
+error: aborting due to 1 previous error
+

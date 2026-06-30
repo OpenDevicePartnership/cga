@@ -1,0 +1,2 @@
+*.stderr text eol=lf
+*.stdout text eol=lf

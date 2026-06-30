@@ -1,0 +1,40 @@
+error: call to associated function `std::process::Command::new` which can panic
+  --> tests/ui/large_std_process.rs:2:13
+   |
+LL |     let _ = std::process::Command::new("evil");
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: 14 different panics from this location
+   = note: backtrace (1 of 3843059837):
+           0: std::rt::panic_fmt (called)
+           1: alloc::raw_vec::RawVec::<u8>::into_box (called)
+           2: std::vec::Vec::<u8>::into_boxed_slice (called)
+           3: <std::boxed::Box<[u8]> as std::clone::Clone>::clone (called)
+           4: <std::ffi::CString as std::clone::Clone>::clone (called)
+           5: std::sys::process::unix::common::Command::new (called)
+           6: std::process::Command::new::<&str> (called) <--
+           7: large_std_process::test (called)
+           8: large_std_process::main (entrypoint)
+   = note: `#[deny(cga::panics)]` on by default
+
+error: call to drop of `std::process::Command` which can panic
+  --> tests/ui/large_std_process.rs:2:47
+   |
+LL |     let _ = std::process::Command::new("evil");
+   |                                               ^
+   |
+   = note: 14 different panics from this location
+   = note: backtrace (1 of 3843090268):
+           0: core::panicking::panic_nounwind_fmt (called)
+           1: <usize as std::slice::SliceIndex<[T]>>::get_unchecked_mut::precondition_check (called)
+           2: <usize as std::slice::SliceIndex<[u8]>>::get_unchecked_mut (called)
+           3: core::slice::<impl [u8]>::get_unchecked_mut::<usize> (called)
+           4: <std::ffi::CString as std::ops::Drop>::drop (called)
+           5: drop of `std::ffi::CString` (called)
+           6: drop of `std::sys::process::unix::common::Command` (called)
+           7: drop of `std::process::Command` (called) <--
+           8: large_std_process::test (called)
+           9: large_std_process::main (entrypoint)
+
+error: aborting due to 2 previous errors
+

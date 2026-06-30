@@ -1,0 +1,34 @@
+error: possible later call to method `core::num::<impl u64>::strict_add` which can panic
+  --> tests/ui/fn_ptr.rs:9:16
+   |
+LL |     let _ptr = u64::strict_add as *const fn(u64) -> u64;
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: this location is called in 2 different traces
+   = note: 3 different panics from this location
+   = note: once a function is cast to a function pointer, cga can no longer tell how it is used
+   = note: as a precaution, it must assume you will eventually call the function
+   = note: backtrace (1 of 4):
+           0: std::rt::panic_fmt (called)
+           1: core::num::imp::overflow_panic::add (called)
+           2: core::num::<impl u64>::strict_add (fn-ptr cast) <--
+           3: fn_ptr::main (entrypoint)
+   = note: `#[deny(cga::panics)]` on by default
+
+error: call to method `core::num::<impl u64>::strict_add` which can panic
+  --> tests/ui/fn_ptr.rs:2:13
+   |
+LL |     let _ = 2u64.strict_add(500);
+   |             ^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: this location is called in 2 different traces
+   = note: 3 different panics from this location
+   = note: backtrace (1 of 4):
+           0: std::rt::panic_fmt (called)
+           1: core::num::imp::overflow_panic::add (called)
+           2: core::num::<impl u64>::strict_add (called) <--
+           3: fn_ptr::test (fn-ptr cast)
+           4: fn_ptr::main (entrypoint)
+
+error: aborting due to 2 previous errors
+

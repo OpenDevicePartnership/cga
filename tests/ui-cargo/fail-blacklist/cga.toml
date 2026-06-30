@@ -1,0 +1,5 @@
+blacklist = [
+    { path = "^std::process::" },
+    { path = "^std::fs::" },
+    { path = "^std::sys::" }
+]

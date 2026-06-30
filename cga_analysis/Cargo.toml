@@ -1,0 +1,15 @@
+[package]
+name = "cga_analysis"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+
+[dependencies]
+lazy-regex = "3.6"
+itertools = "0.15"
+indexmap = "2.14"
+
+cga_data = { path = "../cga_data" }
+
+[package.metadata.rust-analyzer]
+rustc_private = true

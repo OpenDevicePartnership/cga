@@ -1,0 +1,47 @@
+error: call to method `core::num::<impl u64>::strict_add` which can panic
+  --> tests/ui/dyn_trait.rs:14:17
+   |
+LL |         let _ = 2u64.strict_add(500);
+   |                 ^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: 3 different panics from this location
+   = note: backtrace (1 of 2):
+           0: std::rt::panic_fmt (called)
+           1: core::num::imp::overflow_panic::add (called)
+           2: core::num::<impl u64>::strict_add (called) <--
+           3: <dyn_trait::StrictAdd as dyn_trait::Test>::test (possible vtable resolution)
+           4: <dyn dyn_trait::Test as dyn_trait::Test>::test - virtual#3 (called)
+           5: dyn_trait::main (entrypoint)
+   = note: `#[deny(cga::panics)]` on by default
+
+error: call to method `core::num::<impl u64>::strict_sub` which can panic
+  --> tests/ui/dyn_trait.rs:21:17
+   |
+LL |         let _ = 2u64.strict_sub(500);
+   |                 ^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: 3 different panics from this location
+   = note: backtrace (1 of 2):
+           0: std::rt::panic_fmt (called)
+           1: core::num::imp::overflow_panic::sub (called)
+           2: core::num::<impl u64>::strict_sub (called) <--
+           3: <dyn_trait::StrictSub as dyn_trait::Test>::test (possible vtable resolution)
+           4: <dyn dyn_trait::Test as dyn_trait::Test>::test - virtual#3 (called)
+           5: dyn_trait::main (entrypoint)
+
+error: call to function `std::rt::panic_fmt` which is a panic
+  --> tests/ui/dyn_trait.rs:3:9
+   |
+LL |         panic!("Default impl")
+   |         ^^^^^^^^^^^^^^^^^^^^^^ expanded from here
+   |
+   = note: this location is called in 3 different traces
+   = note: 3 different panics from this location
+   = note: backtrace (1 of 3):
+           0: std::rt::panic_fmt (called) <--
+           1: <dyn_trait::DefaultImpl as dyn_trait::Test>::test (possible vtable resolution)
+           2: <dyn dyn_trait::Test as dyn_trait::Test>::test - virtual#3 (called)
+           3: dyn_trait::main (entrypoint)
+
+error: aborting due to 3 previous errors
+

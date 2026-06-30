@@ -1,0 +1,16 @@
+error: call to method `core::num::<impl u64>::strict_add` which can panic
+  --> tests/ui/cycle.rs:13:13
+   |
+LL |     let _ = 2u64.strict_add(500);
+   |             ^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: 3 different panics from this location
+   = note: backtrace (1 of 2):
+           0: std::rt::panic_fmt (called)
+           1: core::num::imp::overflow_panic::add (called)
+           2: core::num::<impl u64>::strict_add (called) <--
+           3: cycle::main (entrypoint)
+   = note: `#[deny(cga::panics)]` on by default
+
+error: aborting due to 1 previous error
+

@@ -1,2 +1,5 @@
 [toolchain]
-components = ["rustfmt", "clippy"]
+channel = "nightly-2026-06-29"
+components = ["cargo", "llvm-tools", "rust-src", "rust-std", "rustc", "rustc-dev", "rustfmt", "clippy"]
+profile = "minimal"
+targets = ["thumbv8m.main-none-eabihf"]
