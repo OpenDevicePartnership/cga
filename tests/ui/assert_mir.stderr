@@ -1,0 +1,14 @@
+error: implicit assert which can panic
+  --> tests/ui/assert_mir.rs:4:5
+   |
+LL |     1 + 1;
+   |     ^^^^^
+   |
+   = note: backtrace:
+           0: assert <--
+           1: assert_mir::test (called)
+           2: assert_mir::main (entrypoint)
+   = note: `#[deny(cga::panics)]` on by default
+
+error: aborting due to 1 previous error
+

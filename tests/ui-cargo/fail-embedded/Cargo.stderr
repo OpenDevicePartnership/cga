@@ -1,0 +1,189 @@
+error: call to method `embassy_executor::Executor::run` which can panic
+  --> src/main.rs:11:1
+   |
+11 | #[embassy_executor::main]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^ expanded from here
+   |
+   = note: 13 different panics from this location
+   = note: backtrace (1 of 17249901):
+           0: core::panicking::panic_fmt (called)
+           1: core::result::unwrap_failed (called)
+           2: core::result::Result::<embassy_executor::SpawnToken<{closure@src/main.rs:11:1: 11:26}>, embassy_executor::SpawnError>::unwrap (called)
+           3: fail_embedded::__cortex_m_rt_main::{closure#0} (called)
+           4: embassy_executor::Executor::run::<{closure@src/main.rs:11:1: 11:26}> (called) <--
+           5: fail_embedded::__cortex_m_rt_main (called)
+           6: fail_embedded::__cortex_m_rt_main_trampoline (entrypoint)
+   = note: `#[deny(cga::panics)]` on by default
+   = note: this error originates in the attribute macro `embassy_executor::main` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: call to function `embassy_rp::init` which can panic
+  --> src/main.rs:13:13
+   |
+13 |     let p = embassy_rp::init(Default::default());
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: 7 different panics from this location
+   = note: backtrace (1 of 731):
+           0: core::panicking::panic_fmt (called)
+           1: core::sync::atomic::compiler_fence (called)
+           2: <embassy_rp::interrupt::Interrupt as embassy_rp::interrupt::InterruptExt>::enable (called)
+           3: embassy_rp::time_driver::init (called)
+           4: embassy_rp::init (called) <--
+           5: fail_embedded::____embassy_main_task::____embassy_main_task_inner_function::{closure#0} (called)
+           6: embassy_executor::raw::TaskStorage::<{async fn body of fail_embedded::____embassy_main_task::____embassy_main_task_inner_function()}>::poll (fn-ptr cast)
+           7: embassy_executor::raw::AvailableTask::<{async fn body of fail_embedded::____embassy_main_task::____embassy_main_task_inner_function()}>::initialize_impl::<{closure@src/main.rs:11:1: 11:26}, {closure@src/main.rs:11:1: 11:26}> (called)
+           8: embassy_executor::raw::TaskPool::<{async fn body of fail_embedded::____embassy_main_task::____embassy_main_task_inner_function()}, 1>::spawn_impl::<{closure@src/main.rs:11:1: 11:26}, {closure@src/main.rs:11:1: 11:26}> (called)
+           9: embassy_executor::raw::TaskPool::<{async fn body of fail_embedded::____embassy_main_task::____embassy_main_task_inner_function()}, 1>::_spawn_async_fn::<{closure@src/main.rs:11:1: 11:26}> (called)
+           10: fail_embedded::__embassy_main (called)
+           11: fail_embedded::__cortex_m_rt_main::{closure#0} (called)
+           12: embassy_executor::Executor::run::<{closure@src/main.rs:11:1: 11:26}> (called)
+           13: fail_embedded::__cortex_m_rt_main (called)
+           14: fail_embedded::__cortex_m_rt_main_trampoline (entrypoint)
+
+error: call to associated function `embassy_rp::gpio::Output::<'d>::new` which can panic
+  --> src/main.rs:14:19
+   |
+14 |     let mut led = Output::new(p.PIN_25, Level::Low);
+   |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: 7 different panics from this location
+   = note: backtrace (1 of 91):
+           0: core::panicking::panic (called)
+           1: embassy_rp::rp_pac::pads::Pads::gpio (called)
+           2: <embassy_rp::peripherals::PIN_25 as embassy_rp::gpio::SealedPin>::pad_ctrl (called)
+           3: embassy_rp::gpio::Flex::<'_>::new::<embassy_rp::peripherals::PIN_25> (called)
+           4: embassy_rp::gpio::Output::<'_>::new::<embassy_rp::peripherals::PIN_25> (called) <--
+           5: fail_embedded::____embassy_main_task::____embassy_main_task_inner_function::{closure#0} (called)
+           6: embassy_executor::raw::TaskStorage::<{async fn body of fail_embedded::____embassy_main_task::____embassy_main_task_inner_function()}>::poll (fn-ptr cast)
+           7: embassy_executor::raw::AvailableTask::<{async fn body of fail_embedded::____embassy_main_task::____embassy_main_task_inner_function()}>::initialize_impl::<{closure@src/main.rs:11:1: 11:26}, {closure@src/main.rs:11:1: 11:26}> (called)
+           8: embassy_executor::raw::TaskPool::<{async fn body of fail_embedded::____embassy_main_task::____embassy_main_task_inner_function()}, 1>::spawn_impl::<{closure@src/main.rs:11:1: 11:26}, {closure@src/main.rs:11:1: 11:26}> (called)
+           9: embassy_executor::raw::TaskPool::<{async fn body of fail_embedded::____embassy_main_task::____embassy_main_task_inner_function()}, 1>::_spawn_async_fn::<{closure@src/main.rs:11:1: 11:26}> (called)
+           10: fail_embedded::__embassy_main (called)
+           11: fail_embedded::__cortex_m_rt_main::{closure#0} (called)
+           12: embassy_executor::Executor::run::<{closure@src/main.rs:11:1: 11:26}> (called)
+           13: fail_embedded::__cortex_m_rt_main (called)
+           14: fail_embedded::__cortex_m_rt_main_trampoline (entrypoint)
+
+error: call to associated function `embassy_rp::gpio::Input::<'d>::new` which can panic
+  --> src/main.rs:15:27
+   |
+15 |     let mut async_input = Input::new(p.PIN_16, Pull::None);
+   |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: 7 different panics from this location
+   = note: backtrace (1 of 83):
+           0: core::panicking::panic (called)
+           1: embassy_rp::rp_pac::pads::Pads::gpio (called)
+           2: <embassy_rp::peripherals::PIN_16 as embassy_rp::gpio::SealedPin>::pad_ctrl (called)
+           3: embassy_rp::gpio::Flex::<'_>::new::<embassy_rp::peripherals::PIN_16> (called)
+           4: embassy_rp::gpio::Input::<'_>::new::<embassy_rp::peripherals::PIN_16> (called) <--
+           5: fail_embedded::____embassy_main_task::____embassy_main_task_inner_function::{closure#0} (called)
+           6: embassy_executor::raw::TaskStorage::<{async fn body of fail_embedded::____embassy_main_task::____embassy_main_task_inner_function()}>::poll (fn-ptr cast)
+           7: embassy_executor::raw::AvailableTask::<{async fn body of fail_embedded::____embassy_main_task::____embassy_main_task_inner_function()}>::initialize_impl::<{closure@src/main.rs:11:1: 11:26}, {closure@src/main.rs:11:1: 11:26}> (called)
+           8: embassy_executor::raw::TaskPool::<{async fn body of fail_embedded::____embassy_main_task::____embassy_main_task_inner_function()}, 1>::spawn_impl::<{closure@src/main.rs:11:1: 11:26}, {closure@src/main.rs:11:1: 11:26}> (called)
+           9: embassy_executor::raw::TaskPool::<{async fn body of fail_embedded::____embassy_main_task::____embassy_main_task_inner_function()}, 1>::_spawn_async_fn::<{closure@src/main.rs:11:1: 11:26}> (called)
+           10: fail_embedded::__embassy_main (called)
+           11: fail_embedded::__cortex_m_rt_main::{closure#0} (called)
+           12: embassy_executor::Executor::run::<{closure@src/main.rs:11:1: 11:26}> (called)
+           13: fail_embedded::__cortex_m_rt_main (called)
+           14: fail_embedded::__cortex_m_rt_main_trampoline (entrypoint)
+
+error: call to method `embassy_rp::gpio::Output::<'d>::set_high` which can panic
+  --> src/main.rs:19:9
+   |
+19 |         led.set_high();
+   |         ^^^^^^^^^^^^^^
+   |
+   = note: 7 different panics from this location
+   = note: backtrace (1 of 15):
+           0: core::panicking::panic (called)
+           1: embassy_rp::rp_pac::sio::Sio::gpio_out (called)
+           2: <embassy_rp::gpio::AnyPin as embassy_rp::gpio::SealedPin>::sio_out (called)
+           3: embassy_rp::gpio::Flex::<'_>::set_high (called)
+           4: embassy_rp::gpio::Output::<'_>::set_high (called) <--
+           5: fail_embedded::____embassy_main_task::____embassy_main_task_inner_function::{closure#0} (called)
+           6: embassy_executor::raw::TaskStorage::<{async fn body of fail_embedded::____embassy_main_task::____embassy_main_task_inner_function()}>::poll (fn-ptr cast)
+           7: embassy_executor::raw::AvailableTask::<{async fn body of fail_embedded::____embassy_main_task::____embassy_main_task_inner_function()}>::initialize_impl::<{closure@src/main.rs:11:1: 11:26}, {closure@src/main.rs:11:1: 11:26}> (called)
+           8: embassy_executor::raw::TaskPool::<{async fn body of fail_embedded::____embassy_main_task::____embassy_main_task_inner_function()}, 1>::spawn_impl::<{closure@src/main.rs:11:1: 11:26}, {closure@src/main.rs:11:1: 11:26}> (called)
+           9: embassy_executor::raw::TaskPool::<{async fn body of fail_embedded::____embassy_main_task::____embassy_main_task_inner_function()}, 1>::_spawn_async_fn::<{closure@src/main.rs:11:1: 11:26}> (called)
+           10: fail_embedded::__embassy_main (called)
+           11: fail_embedded::__cortex_m_rt_main::{closure#0} (called)
+           12: embassy_executor::Executor::run::<{closure@src/main.rs:11:1: 11:26}> (called)
+           13: fail_embedded::__cortex_m_rt_main (called)
+           14: fail_embedded::__cortex_m_rt_main_trampoline (entrypoint)
+
+error: call to method `embassy_rp::gpio::Output::<'d>::set_low` which can panic
+  --> src/main.rs:24:9
+   |
+24 |         led.set_low();
+   |         ^^^^^^^^^^^^^
+   |
+   = note: 7 different panics from this location
+   = note: backtrace (1 of 15):
+           0: core::panicking::panic (called)
+           1: embassy_rp::rp_pac::sio::Sio::gpio_out (called)
+           2: <embassy_rp::gpio::AnyPin as embassy_rp::gpio::SealedPin>::sio_out (called)
+           3: embassy_rp::gpio::Flex::<'_>::set_low (called)
+           4: embassy_rp::gpio::Output::<'_>::set_low (called) <--
+           5: fail_embedded::____embassy_main_task::____embassy_main_task_inner_function::{closure#0} (called)
+           6: embassy_executor::raw::TaskStorage::<{async fn body of fail_embedded::____embassy_main_task::____embassy_main_task_inner_function()}>::poll (fn-ptr cast)
+           7: embassy_executor::raw::AvailableTask::<{async fn body of fail_embedded::____embassy_main_task::____embassy_main_task_inner_function()}>::initialize_impl::<{closure@src/main.rs:11:1: 11:26}, {closure@src/main.rs:11:1: 11:26}> (called)
+           8: embassy_executor::raw::TaskPool::<{async fn body of fail_embedded::____embassy_main_task::____embassy_main_task_inner_function()}, 1>::spawn_impl::<{closure@src/main.rs:11:1: 11:26}, {closure@src/main.rs:11:1: 11:26}> (called)
+           9: embassy_executor::raw::TaskPool::<{async fn body of fail_embedded::____embassy_main_task::____embassy_main_task_inner_function()}, 1>::_spawn_async_fn::<{closure@src/main.rs:11:1: 11:26}> (called)
+           10: fail_embedded::__embassy_main (called)
+           11: fail_embedded::__cortex_m_rt_main::{closure#0} (called)
+           12: embassy_executor::Executor::run::<{closure@src/main.rs:11:1: 11:26}> (called)
+           13: fail_embedded::__cortex_m_rt_main (called)
+           14: fail_embedded::__cortex_m_rt_main_trampoline (entrypoint)
+
+error: call to async fn `embassy_rp::gpio::Input::<'d>::wait_for_high::{closure#0}` which can panic
+  --> src/main.rs:21:37
+   |
+21 |         async_input.wait_for_high().await;
+   |                                     ^^^^^ expanded from here
+   |
+   = note: 7 different panics from this location
+   = note: backtrace (1 of 122):
+           0: core::panicking::panic (called)
+           1: embassy_rp::rp_pac::io::Io::intr (called)
+           2: embassy_rp::gpio::InputFuture::<'_>::new (called)
+           3: embassy_rp::gpio::Flex::<'_>::wait_for_high::{closure#0} (called)
+           4: embassy_rp::gpio::Input::<'_>::wait_for_high::{closure#0} (called) <--
+           5: fail_embedded::____embassy_main_task::____embassy_main_task_inner_function::{closure#0} (called)
+           6: embassy_executor::raw::TaskStorage::<{async fn body of fail_embedded::____embassy_main_task::____embassy_main_task_inner_function()}>::poll (fn-ptr cast)
+           7: embassy_executor::raw::AvailableTask::<{async fn body of fail_embedded::____embassy_main_task::____embassy_main_task_inner_function()}>::initialize_impl::<{closure@src/main.rs:11:1: 11:26}, {closure@src/main.rs:11:1: 11:26}> (called)
+           8: embassy_executor::raw::TaskPool::<{async fn body of fail_embedded::____embassy_main_task::____embassy_main_task_inner_function()}, 1>::spawn_impl::<{closure@src/main.rs:11:1: 11:26}, {closure@src/main.rs:11:1: 11:26}> (called)
+           9: embassy_executor::raw::TaskPool::<{async fn body of fail_embedded::____embassy_main_task::____embassy_main_task_inner_function()}, 1>::_spawn_async_fn::<{closure@src/main.rs:11:1: 11:26}> (called)
+           10: fail_embedded::__embassy_main (called)
+           11: fail_embedded::__cortex_m_rt_main::{closure#0} (called)
+           12: embassy_executor::Executor::run::<{closure@src/main.rs:11:1: 11:26}> (called)
+           13: fail_embedded::__cortex_m_rt_main (called)
+           14: fail_embedded::__cortex_m_rt_main_trampoline (entrypoint)
+
+error: call to associated function `embassy_time::Timer::after_secs` which can panic
+  --> src/main.rs:26:9
+   |
+26 |         Timer::after_secs(2).await;
+   |         ^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: 14 different panics from this location
+   = note: backtrace (1 of 2):
+           0: core::panicking::panic_display::<&str> (called)
+           1: core::option::expect_failed (called)
+           2: core::option::Option::<embassy_time::Instant>::expect (called)
+           3: <embassy_time::Instant as core::ops::Add<embassy_time::Duration>>::add (called)
+           4: embassy_time::Timer::after (called)
+           5: embassy_time::Timer::after_secs (called) <--
+           6: fail_embedded::____embassy_main_task::____embassy_main_task_inner_function::{closure#0} (called)
+           7: embassy_executor::raw::TaskStorage::<{async fn body of fail_embedded::____embassy_main_task::____embassy_main_task_inner_function()}>::poll (fn-ptr cast)
+           8: embassy_executor::raw::AvailableTask::<{async fn body of fail_embedded::____embassy_main_task::____embassy_main_task_inner_function()}>::initialize_impl::<{closure@src/main.rs:11:1: 11:26}, {closure@src/main.rs:11:1: 11:26}> (called)
+           9: embassy_executor::raw::TaskPool::<{async fn body of fail_embedded::____embassy_main_task::____embassy_main_task_inner_function()}, 1>::spawn_impl::<{closure@src/main.rs:11:1: 11:26}, {closure@src/main.rs:11:1: 11:26}> (called)
+           10: embassy_executor::raw::TaskPool::<{async fn body of fail_embedded::____embassy_main_task::____embassy_main_task_inner_function()}, 1>::_spawn_async_fn::<{closure@src/main.rs:11:1: 11:26}> (called)
+           11: fail_embedded::__embassy_main (called)
+           12: fail_embedded::__cortex_m_rt_main::{closure#0} (called)
+           13: embassy_executor::Executor::run::<{closure@src/main.rs:11:1: 11:26}> (called)
+           14: fail_embedded::__cortex_m_rt_main (called)
+           15: fail_embedded::__cortex_m_rt_main_trampoline (entrypoint)
+
+error: could not compile `fail-embedded` (bin "fail-embedded") due to 8 previous errors
+Error: 101

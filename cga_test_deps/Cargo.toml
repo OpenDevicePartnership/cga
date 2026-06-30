@@ -1,0 +1,11 @@
+[package]
+name = "cga_test_deps"
+version = "0.1.0"
+edition = "2021"
+
+# Add dependencies here to make them available in ui tests.
+
+[dependencies]
+
+# Make sure we are not part of the rustc workspace.
+[workspace]

@@ -1,0 +1,5 @@
+whitelist = []
+
+[options]
+allow_async_panic = true
+allow_assert = false

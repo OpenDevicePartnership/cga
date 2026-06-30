@@ -1,16 +1,53 @@
 [package]
-name = "embedded-rust-template"
+name = "cga"
 version = "0.1.0"
-edition = "2021"
+description = "Call graph analysis tool for Rust"
+repository = "https://github.com/OpenDevicePartnership/cga"
+authors = ["Wouter Geraedts <w.geraedts@sarif.n>"]
+readme = "README.md"
 license = "MIT"
-repository = "https://github.com/OpenDevicePartnership/embedded-rust-template"
-rust-version = "1.85"
+keywords = ["lint", "plugin"]
+categories = ["development-tools", "development-tools::cargo-plugins"]
+build = "build.rs"
+edition = "2024"
+publish = false
+
+[[bin]]
+name = "cargo-cga"
+test = false
+path = "bin/cargo-cga.rs"
+
+[[bin]]
+name = "cga-driver"
+path = "bin/cga-driver.rs"
 
 [dependencies]
-# dependencies for all targets
+cga_analysis = { path = "cga_analysis" }
+cga_data = { path = "cga_data" }
+cga_cargo = { path = "cga_cargo" }
 
-[target.'cfg(target_os = "none")'.dependencies]
-# dependencies for no-std targets
+serde = { version = "1.0.145", features = ["derive"] }
+serde_json = "1.0"
+
+tracing = "0.1"
+tracing-subscriber = "0.3"
+
+[dev-dependencies]
+ui_test = { version = "0.30.7", default-features = false, features = ["rustc"] }
+
+[features]
+
+[package.metadata.rust-analyzer]
+# This package uses #[feature(rustc_private)]
+rustc_private = true
+
+[[test]]
+name = "compile-test"
+harness = false
+
+[lints.rust.unexpected_cfgs]
+level = "warn"
+check-cfg = ['cfg(bootstrap)']
 
 [lints.clippy]
 suspicious = "deny"

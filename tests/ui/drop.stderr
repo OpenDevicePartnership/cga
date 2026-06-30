@@ -1,0 +1,17 @@
+error: call to function `core::panicking::panic_fmt` which is a panic
+  --> tests/ui/drop.rs:5:9
+   |
+LL |         panic!("Oh no!");
+   |         ^^^^^^^^^^^^^^^^ expanded from here
+   |
+   = note: 3 different panics from this location
+   = note: backtrace:
+           0: core::panicking::panic_fmt (called) <--
+           1: <drop::Foo as std::ops::Drop>::drop (called)
+           2: drop of `Foo` (called)
+           3: std::mem::drop::<drop::Foo> (called)
+           4: drop::main (entrypoint)
+   = note: `#[deny(cga::panics)]` on by default
+
+error: aborting due to 1 previous error
+

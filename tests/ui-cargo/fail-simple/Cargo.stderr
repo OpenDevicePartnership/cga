@@ -1,0 +1,48 @@
+error: call to method `core::num::<impl u64>::strict_add` which can panic
+ --> src/main.rs:7:13
+  |
+7 |     let _ = 2u64.strict_add(500);
+  |             ^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: 3 different panics from this location
+  = note: backtrace (1 of 2):
+          0: core::panicking::panic_fmt (called)
+          1: core::num::imp::overflow_panic::add (called)
+          2: core::num::<impl u64>::strict_add (called) <--
+          3: fail_simple::test (called)
+          4: fail_simple::main (entrypoint)
+note: the lint level is defined here
+ --> src/main.rs:3:11
+  |
+3 | #![forbid(cga::panics)]
+  |           ^^^^^^^^^^^
+
+error: call to function `core::panicking::panic_fmt` which is a panic
+  --> src/main.rs:16:9
+   |
+16 |         panic!("Oh no!");
+   |         ^^^^^^^^^^^^^^^^ expanded from here
+   |
+   = note: this location is called in 2 different traces
+   = note: 3 different panics from this location
+   = note: backtrace (1 of 2):
+           0: core::panicking::panic_fmt (called) <--
+           1: <fail_simple::Foo as std::ops::Drop>::drop (called)
+           2: drop of `Foo` (called)
+           3: std::mem::drop::<fail_simple::Foo> (called)
+           4: fail_simple::main (entrypoint)
+
+error: can be poll'd after Ready which is a panic
+  --> src/main.rs:10:16
+   |
+10 | async fn bar() {}
+   |                ^^
+   |
+   = note: backtrace:
+           0: implicit async panic <--
+           1: fail_simple::bar::{closure#0} (called)
+           2: embassy_futures::block_on::<{async fn body of fail_simple::bar()}> (called)
+           3: fail_simple::main (entrypoint)
+
+error: could not compile `fail-simple` (bin "fail-simple") due to 3 previous errors
+Error: 101

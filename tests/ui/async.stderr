@@ -1,0 +1,50 @@
+error: can be poll'd after Ready which is a panic
+  --> tests/ui/async.rs:2:17
+   |
+LL |   async fn test() {
+   |  _________________^
+LL | |     // Do nothing.
+LL | | }
+   | |_^
+   |
+   = note: this location is called in 2 different traces
+   = note: backtrace (1 of 2):
+           0: implicit async panic <--
+           1: async::test::{closure#0} (called)
+           2: async::main (entrypoint)
+   = note: `#[deny(cga::panics)]` on by default
+
+error: can be poll'd after Ready which is a panic
+  --> tests/ui/async.rs:7:28
+   |
+LL |   async fn test_with_panic() {
+   |  ____________________________^
+LL | |     let x = 5u32;
+LL | |     let x = x.saturating_add(10);
+LL | |     let (x, _) = x.overflowing_add(5);
+...  |
+LL | | }
+   | |_^
+   |
+   = note: this location is called in 2 different traces
+   = note: backtrace (1 of 2):
+           0: implicit async panic <--
+           1: async::test_with_panic::{closure#0} (called)
+           2: async::main (entrypoint)
+
+error: call to method `core::num::<impl u32>::strict_add` which can panic
+  --> tests/ui/async.rs:11:13
+   |
+LL |     let _ = x.strict_add(3);
+   |             ^^^^^^^^^^^^^^^
+   |
+   = note: 3 different panics from this location
+   = note: backtrace (1 of 2):
+           0: core::panicking::panic_fmt (called)
+           1: core::num::imp::overflow_panic::add (called)
+           2: core::num::<impl u32>::strict_add (called) <--
+           3: async::test_with_panic::{closure#0} (called)
+           4: async::main (entrypoint)
+
+error: aborting due to 3 previous errors
+
