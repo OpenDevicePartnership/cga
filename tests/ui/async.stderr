@@ -8,6 +8,7 @@ LL | | }
    | |_^
    |
    = note: this location is called in 2 different traces
+   = note: an async block can always panic when poll'd after Ready
    = note: backtrace (1 of 2):
            0: implicit async panic <--
            1: async::test::{closure#0} (called)
@@ -27,6 +28,7 @@ LL | | }
    | |_^
    |
    = note: this location is called in 2 different traces
+   = note: an async block can always panic when poll'd after Ready
    = note: backtrace (1 of 2):
            0: implicit async panic <--
            1: async::test_with_panic::{closure#0} (called)

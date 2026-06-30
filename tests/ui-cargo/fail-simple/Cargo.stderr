@@ -38,6 +38,7 @@ error: can be poll'd after Ready which is a panic
 10 | async fn bar() {}
    |                ^^
    |
+   = note: an async block can always panic when poll'd after Ready
    = note: backtrace:
            0: implicit async panic <--
            1: fail_simple::bar::{closure#0} (called)

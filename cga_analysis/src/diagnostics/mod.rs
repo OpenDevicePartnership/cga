@@ -327,7 +327,7 @@ fn lint_use<Engine: LintEngine>(data: LintData<'_, '_>, tcx: TyCtxt<'_>) {
                 ));
             }
 
-            if let Some(leaf) = data.trace.first() {
+            if let Some(leaf) = data.trace.last() {
                 decorate_leaf(&leaf, diag);
             }
 
