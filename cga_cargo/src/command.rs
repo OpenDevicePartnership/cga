@@ -17,7 +17,7 @@ use crate::args::{Opts, OutputFormat, Subcommand, cargo::CargoArgs};
 
 fn toolchain() -> String {
     let toolchain = env!("RUSTUP_TOOLCHAIN");
-    let regex = Regex::new("^(nightly-[0-9]{4}-[0-9]{2}-[0-9]{2})-.+").unwrap();
+    let regex = Regex::new("^(nightly-[0-9]{4}-[0-9]{2}-[0-9]{2})(?:-.+)?$").unwrap();
     regex
         .captures(toolchain)
         .expect(&format!(
