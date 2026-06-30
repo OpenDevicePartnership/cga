@@ -2,6 +2,7 @@
 name = "cga_test_deps"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
 
 # Add dependencies here to make them available in ui tests.
 

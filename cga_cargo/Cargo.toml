@@ -2,6 +2,7 @@
 name = "cga_cargo"
 version = "0.1.0"
 edition = "2024"
+license = "MIT"
 
 [dependencies]
 cga_data = { path = "../cga_data" }

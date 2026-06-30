@@ -2,6 +2,7 @@
 name = "cga_analysis"
 version = "0.1.0"
 edition = "2024"
+license = "MIT"
 
 [dependencies]
 lazy-regex = "3.6"
