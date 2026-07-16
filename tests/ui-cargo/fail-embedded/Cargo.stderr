@@ -4,8 +4,8 @@ error: call to method `embassy_executor::Executor::run` which can panic
 11 | #[embassy_executor::main]
    | ^^^^^^^^^^^^^^^^^^^^^^^^^ expanded from here
    |
-   = note: 13 different panics from this location
-   = note: backtrace (1 of 17249841):
+   = note: 10 different panics from this location
+   = note: backtrace (1 of 16511908):
            0: core::panicking::panic_fmt (called)
            1: core::result::unwrap_failed (called)
            2: core::result::Result::<embassy_executor::SpawnToken<{closure@src/main.rs:11:1: 11:26}>, embassy_executor::SpawnError>::unwrap (called)
@@ -25,9 +25,9 @@ error: call to function `embassy_rp::init` which can panic
    = note: 7 different panics from this location
    = note: backtrace (1 of 721):
            0: core::panicking::panic_fmt (called)
-           1: core::sync::atomic::compiler_fence (called)
-           2: <embassy_rp::interrupt::Interrupt as embassy_rp::interrupt::InterruptExt>::enable (called)
-           3: embassy_rp::time_driver::init (called)
+           1: core::sync::atomic::atomic_store::<u32> (called)
+           2: core::sync::atomic::Atomic::<u32>::store (called)
+           3: embassy_rp::clocks::init (called)
            4: embassy_rp::init (called) <--
            5: fail_embedded::____embassy_main_task::____embassy_main_task_inner_function::{closure#0} (called)
            6: embassy_executor::raw::TaskStorage::<{async fn body of fail_embedded::____embassy_main_task::____embassy_main_task_inner_function()}>::poll (fn-ptr cast)
@@ -166,7 +166,7 @@ error: call to associated function `embassy_time::Timer::after_secs` which can p
 26 |         Timer::after_secs(2).await;
    |         ^^^^^^^^^^^^^^^^^^^^
    |
-   = note: 14 different panics from this location
+   = note: 11 different panics from this location
    = note: backtrace (1 of 2):
            0: core::panicking::panic_display::<&str> (called)
            1: core::option::expect_failed (called)

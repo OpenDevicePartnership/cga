@@ -4,8 +4,8 @@ error: call to associated function `std::process::Command::new` which can panic
 7 |     let _ = std::process::Command::new("evil");
   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   |
-  = note: 14 different panics from this location
-  = note: backtrace (1 of 3843059837):
+  = note: 11 different panics from this location
+  = note: backtrace (1 of 1863650189):
           0: std::rt::panic_fmt (called)
           1: alloc::raw_vec::RawVec::<u8>::into_box (called)
           2: std::vec::Vec::<u8>::into_boxed_slice (called)
@@ -23,8 +23,8 @@ error: call to drop of `std::process::Command` which can panic
 7 |     let _ = std::process::Command::new("evil");
   |                                               ^
   |
-  = note: 14 different panics from this location
-  = note: backtrace (1 of 3843090268):
+  = note: 11 different panics from this location
+  = note: backtrace (1 of 1863680573):
           0: core::panicking::panic_nounwind_fmt (called)
           1: <usize as std::slice::SliceIndex<[T]>>::get_unchecked_mut::precondition_check (called)
           2: <usize as std::slice::SliceIndex<[u8]>>::get_unchecked_mut (called)
@@ -42,7 +42,7 @@ error: call to associated function `std::process::Command::new` which is blackli
 7 |     let _ = std::process::Command::new("evil");
   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   |
-  = note: 104 different blacklisted functions from this location
+  = note: 101 different blacklisted functions from this location
   = note: backtrace:
           0: std::process::Command::new::<&str> (called) <--
           1: fail_blacklist::test (called)
@@ -59,8 +59,8 @@ error: call to drop of `std::process::Command` which can call blacklisted functi
 7 |     let _ = std::process::Command::new("evil");
   |                                               ^
   |
-  = note: 105 different blacklisted functions from this location
-  = note: backtrace (1 of 42160433):
+  = note: 101 different blacklisted functions from this location
+  = note: backtrace (1 of 20283553):
           0: std::sys::fs::unix::debug_assert_fd_is_open (called)
           1: <std::os::fd::OwnedFd as std::ops::Drop>::drop (called)
           2: drop of `std::os::fd::OwnedFd` (called)
