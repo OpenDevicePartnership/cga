@@ -306,22 +306,7 @@ impl<'b, 'a, 'tcx> PostMonoNode<'b, 'a, 'tcx> {
                     debug!("ignoring call to non-constant function {func:?}");
                     return vec![];
                 };
-                let mut instance = self.monomorphize_instance(pre_mono_call, generic_args, span);
-
-                // Look for `<T as Fn>::call` for some T.
-                // If T is a function type, the compiler synthesizes an impl, so we'll check
-                // the trait declaration in libcore which isn't what we want. Check if the
-                // function is annotated instead.
-                if let InstanceKind::Shim(ShimKind::FnPtr(_, ty) | ShimKind::FnPtrAddr(_, ty)) = instance.def
-                    && let ty::FnDef(fn_item, fn_args) = ty.kind()
-                {
-                    debug!("found function item {fn_item:?}");
-                    instance = self.monomorphize_instance(*fn_item, fn_args, span);
-                }
-
-                // Double check if our instance is OK
-
-                instance
+                self.monomorphize_instance(pre_mono_call, generic_args, span)
             }
             TerminatorKind::Drop { place, .. } => {
                 let (ty, _) = self.monomorphize_args(place.ty(self.body, tcx));
