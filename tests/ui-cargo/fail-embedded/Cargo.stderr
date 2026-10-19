@@ -7,12 +7,13 @@ error: call to method `embassy_executor::Executor::run` which can panic
    = note: 10 different panics from this location
    = note: backtrace (1 of 17414139):
            0: core::panicking::panic_fmt (called)
-           1: core::result::unwrap_failed (called)
-           2: core::result::Result::<embassy_executor::SpawnToken<{closure@src/main.rs:11:1: 11:26}>, embassy_executor::SpawnError>::unwrap (called)
-           3: fail_embedded::__cortex_m_rt_main::{closure#0} (called)
-           4: embassy_executor::Executor::run::<{closure@src/main.rs:11:1: 11:26}> (called) <--
-           5: fail_embedded::__cortex_m_rt_main (called)
-           6: fail_embedded::__cortex_m_rt_main_trampoline (entrypoint)
+           1: core::result::unwrap_failed::unwrap_failed_inner (called)
+           2: core::result::unwrap_failed::<embassy_executor::SpawnError> (called)
+           3: core::result::Result::<embassy_executor::SpawnToken<{closure@src/main.rs:11:1: 11:26}>, embassy_executor::SpawnError>::unwrap (called)
+           4: fail_embedded::__cortex_m_rt_main::{closure#0} (called)
+           5: embassy_executor::Executor::run::<{closure@src/main.rs:11:1: 11:26}> (called) <--
+           6: fail_embedded::__cortex_m_rt_main (called)
+           7: fail_embedded::__cortex_m_rt_main_trampoline (entrypoint)
    = note: `#[deny(cga::panics)]` on by default
    = note: this error originates in the attribute macro `embassy_executor::main` (in Nightly builds, run with -Z macro-backtrace for more info)
 
