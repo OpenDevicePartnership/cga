@@ -120,9 +120,9 @@ fn main() -> ExitCode {
             .is_some();
 
         if ignore {
-            rustc_driver::run_compiler(&args, &mut rustc_driver::TimePassesCallbacks::default());
+            rustc_driver::compiler_entrypoint(&args, &mut rustc_driver::TimePassesCallbacks::default());
         } else {
-            rustc_driver::run_compiler(&args, &mut Cga)
+            rustc_driver::compiler_entrypoint(&args, &mut Cga)
         }
     })
 }
