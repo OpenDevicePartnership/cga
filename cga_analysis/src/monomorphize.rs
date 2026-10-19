@@ -5,16 +5,14 @@
 //!
 //! `NoConstOrStatic` has been added, as well as an extra check for the existence of the `no_mangle` and `export_name` attributes.
 
-use rustc_attr_ir::lang_items::LangItem;
+use rustc_attr_ir::{HasAttrs, InlineAttr, lang_items::LangItem};
 use rustc_data_structures::fx::FxIndexMap;
 use rustc_hir::{
     ImplItemId, ItemId,
-    attrs::{HasAttrs, InlineAttr},
     def::DefKind,
     def_id::{DefId, LocalDefId},
 };
 use rustc_middle::{
-    bug,
     middle::codegen_fn_attrs::CodegenFnAttrFlags,
     mir::{self},
     mono::MonoItem,
@@ -25,7 +23,7 @@ use rustc_middle::{
     ty::GenericArgs,
 };
 use rustc_session::config::EntryFnType;
-use rustc_span::{DUMMY_SP, Span, Spanned, dummy_spanned, respan};
+use rustc_span::{DUMMY_SP, Span, Spanned, bug, dummy_spanned, respan};
 use rustc_type_ir::TypeVisitableExt;
 
 use rustc_log::tracing::*;
@@ -309,7 +307,7 @@ impl<'v> RootCollector<'_, 'v> {
         }
 
         let has_export_link_name = HasAttrs::get_attrs(def_id, &self.tcx).iter().any(|attr| match attr {
-            rustc_hir::Attribute::Parsed(rustc_hir::attrs::AttributeKind::ExportName { .. }) => true,
+            rustc_attr_ir::Attribute::Parsed(rustc_attr_ir::AttributeKind::ExportName { .. }) => true,
             _ => false,
         });
         let no_mangle = attrs.flags.contains(CodegenFnAttrFlags::NO_MANGLE);
