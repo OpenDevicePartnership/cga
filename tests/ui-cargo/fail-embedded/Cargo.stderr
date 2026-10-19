@@ -5,7 +5,7 @@ error: call to method `embassy_executor::Executor::run` which can panic
    | ^^^^^^^^^^^^^^^^^^^^^^^^^ expanded from here
    |
    = note: 10 different panics from this location
-   = note: backtrace (1 of 16511908):
+   = note: backtrace (1 of 15516919):
            0: core::panicking::panic_fmt (called)
            1: core::result::unwrap_failed (called)
            2: core::result::Result::<embassy_executor::SpawnToken<{closure@src/main.rs:11:1: 11:26}>, embassy_executor::SpawnError>::unwrap (called)
@@ -25,7 +25,7 @@ error: call to function `embassy_rp::init` which can panic
    = note: 7 different panics from this location
    = note: backtrace (1 of 721):
            0: core::panicking::panic_fmt (called)
-           1: core::sync::atomic::atomic_store::<u32> (called)
+           1: core::sync::atomic::atomic_store::<u32, false> (called)
            2: core::sync::atomic::Atomic::<u32>::store (called)
            3: embassy_rp::clocks::init (called)
            4: embassy_rp::init (called) <--

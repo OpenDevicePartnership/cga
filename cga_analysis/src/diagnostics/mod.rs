@@ -1,8 +1,8 @@
 use cga_data::cmd::LintConfig;
 use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
+use rustc_attr_ir::lang_items::LangItem;
 use rustc_errors::{Diag, MultiSpan};
-use rustc_hir::LangItem;
 use rustc_lint::Lint;
 use rustc_log::tracing::*;
 use rustc_middle::ty::TyCtxt;

@@ -2,6 +2,7 @@
 #![feature(impl_trait_in_assoc_type)]
 
 extern crate rustc_abi;
+extern crate rustc_attr_ir;
 extern crate rustc_data_structures;
 extern crate rustc_driver;
 extern crate rustc_errors;
@@ -10,6 +11,7 @@ extern crate rustc_index;
 extern crate rustc_infer;
 extern crate rustc_interface;
 extern crate rustc_lint;
+extern crate rustc_lint_defs;
 extern crate rustc_log;
 extern crate rustc_macros;
 extern crate rustc_middle;
@@ -32,11 +34,11 @@ pub mod monomorphize;
 pub mod post_mono;
 
 use rustc_hir::{HirId, def_id::DefId};
+use rustc_lint_defs::declare_tool_lint;
 use rustc_middle::{
     mir::{Body, SourceInfo},
     ty::{Instance, TyCtxt, print::with_resolve_crate_name},
 };
-use rustc_session::declare_tool_lint;
 use rustc_span::Span;
 
 declare_tool_lint! {
