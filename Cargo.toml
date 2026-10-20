@@ -4,7 +4,6 @@ version = "0.1.0"
 description = "Call graph analysis tool for Rust"
 repository = "https://github.com/OpenDevicePartnership/cga"
 authors = ["Wouter Geraedts <w.geraedts@sarif.n>"]
-readme = "README.md"
 license = "MIT"
 keywords = ["lint", "plugin"]
 categories = ["development-tools", "development-tools::cargo-plugins"]

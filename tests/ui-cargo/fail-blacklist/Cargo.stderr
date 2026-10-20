@@ -5,7 +5,7 @@ error: call to associated function `std::process::Command::new` which can panic
   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   |
   = note: 11 different panics from this location
-  = note: backtrace (1 of 1863650189):
+  = note: backtrace (1 of 2021126033):
           0: std::rt::panic_fmt (called)
           1: alloc::raw_vec::RawVec::<u8>::into_box (called)
           2: std::vec::Vec::<u8>::into_boxed_slice (called)
@@ -24,7 +24,7 @@ error: call to drop of `std::process::Command` which can panic
   |                                               ^
   |
   = note: 11 different panics from this location
-  = note: backtrace (1 of 1863680573):
+  = note: backtrace (1 of 2021158477):
           0: core::panicking::panic_nounwind_fmt (called)
           1: <usize as std::slice::SliceIndex<[T]>>::get_unchecked_mut::precondition_check (called)
           2: <usize as std::slice::SliceIndex<[u8]>>::get_unchecked_mut (called)
@@ -42,7 +42,7 @@ error: call to associated function `std::process::Command::new` which is blackli
 7 |     let _ = std::process::Command::new("evil");
   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   |
-  = note: 101 different blacklisted functions from this location
+  = note: 99 different blacklisted functions from this location
   = note: backtrace:
           0: std::process::Command::new::<&str> (called) <--
           1: fail_blacklist::test (called)
@@ -59,8 +59,8 @@ error: call to drop of `std::process::Command` which can call blacklisted functi
 7 |     let _ = std::process::Command::new("evil");
   |                                               ^
   |
-  = note: 101 different blacklisted functions from this location
-  = note: backtrace (1 of 20283553):
+  = note: 99 different blacklisted functions from this location
+  = note: backtrace (1 of 20629713):
           0: std::sys::fs::unix::debug_assert_fd_is_open (called)
           1: <std::os::fd::OwnedFd as std::ops::Drop>::drop (called)
           2: drop of `std::os::fd::OwnedFd` (called)

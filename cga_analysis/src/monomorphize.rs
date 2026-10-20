@@ -5,15 +5,14 @@
 //!
 //! `NoConstOrStatic` has been added, as well as an extra check for the existence of the `no_mangle` and `export_name` attributes.
 
+use rustc_attr_ir::{HasAttrs, InlineAttr, lang_items::LangItem};
 use rustc_data_structures::fx::FxIndexMap;
 use rustc_hir::{
-    ImplItemId, ItemId, LangItem,
-    attrs::{HasAttrs, InlineAttr},
+    ImplItemId, ItemId,
     def::DefKind,
     def_id::{DefId, LocalDefId},
 };
 use rustc_middle::{
-    bug,
     middle::codegen_fn_attrs::CodegenFnAttrFlags,
     mir::{self},
     mono::MonoItem,
@@ -24,7 +23,7 @@ use rustc_middle::{
     ty::GenericArgs,
 };
 use rustc_session::config::EntryFnType;
-use rustc_span::{DUMMY_SP, Span, Spanned, dummy_spanned, respan};
+use rustc_span::{DUMMY_SP, Span, Spanned, bug, dummy_spanned, respan};
 use rustc_type_ir::TypeVisitableExt;
 
 use rustc_log::tracing::*;
@@ -155,7 +154,7 @@ impl<'v> RootCollector<'_, 'v> {
                     // generate a `drop_in_place` instance for it.
                     if self
                         .tcx
-                        .instantiate_and_check_impossible_predicates((id.owner_id.to_def_id(), id_args))
+                        .instantiate_and_check_impossible_clauses((id.owner_id.to_def_id(), id_args))
                     {
                         return;
                     }
@@ -193,7 +192,7 @@ impl<'v> RootCollector<'_, 'v> {
                     let def_id = id.owner_id.to_def_id();
                     // Type Consts don't have bodies to evaluate
                     // nor do they make sense as a static.
-                    if self.tcx.is_type_const(def_id) {
+                    if self.tcx.const_of_item(def_id).is_some() {
                         // FIXME(mgca): Is this actually what we want? We may want to
                         // normalize to a ValTree then convert to a const allocation and
                         // collect that?
@@ -308,7 +307,7 @@ impl<'v> RootCollector<'_, 'v> {
         }
 
         let has_export_link_name = HasAttrs::get_attrs(def_id, &self.tcx).iter().any(|attr| match attr {
-            rustc_hir::Attribute::Parsed(rustc_hir::attrs::AttributeKind::ExportName { .. }) => true,
+            rustc_attr_ir::Attribute::Parsed(rustc_attr_ir::AttributeKind::ExportName { .. }) => true,
             _ => false,
         });
         let no_mangle = attrs.flags.contains(CodegenFnAttrFlags::NO_MANGLE);
@@ -428,7 +427,7 @@ fn visit_instance_use<'tcx>(
     }
 
     match instance.def {
-        ty::InstanceKind::Virtual(..) | ty::InstanceKind::Intrinsic(_) => {
+        ty::InstanceKind::Virtual(..) | ty::InstanceKind::LlvmIntrinsic(_) | ty::InstanceKind::Intrinsic(_) => {
             if !is_direct_call {
                 bug!("{:?} being reified", instance);
             }
@@ -456,7 +455,8 @@ fn visit_instance_use<'tcx>(
             | ty::ShimKind::ConstructCoroutineInClosure { .. }
             | ty::ShimKind::FnPtr(..)
             | ty::ShimKind::Clone(..)
-            | ty::ShimKind::FnPtrAddr(..),
+            | ty::ShimKind::FnPtrAsPtr(..)
+            | ty::ShimKind::FnPtrFromPtr(..),
         )
         | ty::InstanceKind::Item(..) => {
             output.push(create_fn_mono_item(tcx, instance, source));
@@ -484,11 +484,9 @@ fn collect_alloc<'tcx>(tcx: TyCtxt<'tcx>, alloc_id: AllocId, output: &mut MonoIt
             let ptrs = alloc.inner().provenance().ptrs();
             // avoid `ensure_sufficient_stack` in the common case of "no pointers"
             if !ptrs.is_empty() {
-                rustc_data_structures::stack::ensure_sufficient_stack(move || {
-                    for &prov in ptrs.values() {
-                        collect_alloc(tcx, prov.alloc_id(), output);
-                    }
-                });
+                for &prov in ptrs.values() {
+                    collect_alloc(tcx, prov.alloc_id(), output);
+                }
             }
         }
         GlobalAlloc::Function { instance, .. } => {
@@ -547,7 +545,7 @@ fn create_mono_items_for_default_impls<'tcx>(tcx: TyCtxt<'tcx>, item: ItemId, ou
     // consider higher-ranked predicates such as `for<'a> &'a mut [u8]: Copy` to
     // be trivially false. We must now check that the impl has no impossible-to-satisfy
     // predicates.
-    if tcx.instantiate_and_check_impossible_predicates((item.owner_id.to_def_id(), impl_args)) {
+    if tcx.instantiate_and_check_impossible_clauses((item.owner_id.to_def_id(), impl_args)) {
         return;
     }
 

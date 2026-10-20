@@ -1,8 +1,8 @@
 use cga_data::cmd::LintConfig;
 use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
+use rustc_attr_ir::lang_items::LangItem;
 use rustc_errors::{Diag, MultiSpan};
-use rustc_hir::LangItem;
 use rustc_lint::Lint;
 use rustc_log::tracing::*;
 use rustc_middle::ty::TyCtxt;
@@ -245,7 +245,7 @@ fn decorate_expansion(use_: &Use<'_>, multi_span: &mut MultiSpan) {
 }
 
 /// Decorate with extra notes if the leaf node is a panic associated with an async coroutine
-fn decorate_leaf(use_: &Use<'_>, diag: &mut Diag<'_, ()>) {
+fn decorate_leaf(use_: &Use<'_>, diag: &mut Diag<'_>) {
     match use_.kind {
         UseKind::AsyncPanic => {
             diag.note("an async block can always panic when poll'd after Ready");
@@ -255,7 +255,7 @@ fn decorate_leaf(use_: &Use<'_>, diag: &mut Diag<'_, ()>) {
 }
 
 /// Decorate with extra notes if the boundary is not a straightforward function call
-fn decorate_cast(use_: &Use<'_>, diag: &mut Diag<'_, ()>) {
+fn decorate_cast(use_: &Use<'_>, diag: &mut Diag<'_>) {
     if matches!(use_.kind, UseKind::FnPtrCast(..)) {
         diag.note("once a function is cast to a function pointer, cga can no longer tell how it is used");
         diag.note("as a precaution, it must assume you will eventually call the function");

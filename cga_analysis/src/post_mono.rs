@@ -20,12 +20,11 @@ use rustc_hir::{CoroutineDesugaring, CoroutineKind, def_id::DefId};
 use rustc_log::tracing::*;
 use rustc_middle::mir::{self, Body, CastKind, Location, Rvalue, Terminator, TerminatorKind, visit::Visitor as _};
 use rustc_middle::mono::MonoItem;
-use rustc_middle::span_bug;
 use rustc_middle::ty::adjustment::PointerCoercion;
 use rustc_middle::ty::{
     self, EarlyBinder, GenericArgsRef, Instance, InstanceKind, ShimKind, TyCtxt, TypeFoldable, TypingEnv,
 };
-use rustc_span::Span;
+use rustc_span::{Span, span_bug};
 use rustc_type_ir::CoroutineArgs;
 
 use crate::dyn_object::dyn_object_call_to_impl_methods;
