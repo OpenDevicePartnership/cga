@@ -86,13 +86,31 @@ pub fn extract<'tcx>(tcx: TyCtxt<'tcx>, roots: Vec<MonoItem<'tcx>>) -> Callgraph
 
 impl<'a, 'tcx> mir::visit::Visitor<'tcx> for AnalysisNode<'a, 'tcx> {
     fn visit_terminator(&mut self, terminator: &Terminator<'tcx>, location: Location) {
-        for use_ in self.get_call_def_mir(terminator) {
-            self.on_edge(use_);
+        let source = terminator.source_info;
+        let span = source.span;
+        let tcx = self.state.tcx;
+
+        // Assert that can result in a panic.
+        if let TerminatorKind::Assert { .. } = terminator.kind {
+            self.on_edge(Use::for_location(UseKind::BuiltinMirAssert, self.body, source));
         }
 
-        if let TerminatorKind::Assert { .. } = terminator.kind {
-            let use_ = Use::for_location(UseKind::BuiltinMirAssert, self.body, terminator.source_info);
-            self.on_edge(use_);
+        // Call-like terminators.
+        if let Some(instance) = match &terminator.kind {
+            TerminatorKind::Call { func, .. } | TerminatorKind::TailCall { func, .. } => {
+                self.resolve_fn_operand_opt(func, span)
+            }
+            TerminatorKind::Drop { place, .. } => {
+                let ty = self.instance.instantiate_mir_and_normalize_erasing_regions(
+                    tcx,
+                    TypingEnv::codegen(tcx, self.instance.def_id()),
+                    EarlyBinder::bind(tcx, place.ty(self.body, tcx)),
+                );
+                Some(Instance::resolve_drop_glue(tcx, ty.ty))
+            }
+            _ => None,
+        } {
+            self.on_edge(Use::for_location(UseKind::Called(instance), self.body, source));
         }
 
         self.super_terminator(terminator, location);
@@ -102,8 +120,7 @@ impl<'a, 'tcx> mir::visit::Visitor<'tcx> for AnalysisNode<'a, 'tcx> {
         // We are only interested in rvalue's when a fn is cast to a fnptr.
         // Reasoning what happens to this ptr value is out of scope and hence we assume
         // it will be used (derefenced & called) at some later point.
-        if let Rvalue::Cast(CastKind::PointerCoercion(PointerCoercion::ReifyFnPointer(_), _), operand, _) =
-            rvalue
+        if let Rvalue::Cast(CastKind::PointerCoercion(PointerCoercion::ReifyFnPointer(_), _), operand, _) = rvalue
             && let span = operand.span(self.body)
             && let Some(instance) = self.resolve_fn_operand_opt(operand, span)
         {
@@ -113,8 +130,8 @@ impl<'a, 'tcx> mir::visit::Visitor<'tcx> for AnalysisNode<'a, 'tcx> {
                 self.body.source_info(location).clone(),
             );
             self.on_edge(use_);
-            self.super_rvalue(rvalue, location);
         }
+        self.super_rvalue(rvalue, location);
     }
 }
 
@@ -154,37 +171,6 @@ impl<'a, 'tcx> AnalysisNode<'a, 'tcx> {
                 );
             }
         }
-    }
-
-    /// For a given terminator, yield all definitions that are called.
-    fn get_call_def_mir(&self, terminator: &Terminator<'tcx>) -> Vec<Use<'tcx>> {
-        let tcx = self.state.tcx;
-        let span = terminator.source_info.span;
-
-        let call_instance = match &terminator.kind {
-            TerminatorKind::Call { func, .. } | TerminatorKind::TailCall { func, .. } => {
-                if let Some(instance) = self.resolve_fn_operand_opt(func, span) {
-                    instance
-                } else {
-                    return vec![];
-                }
-            }
-            TerminatorKind::Drop { place, .. } => {
-                let ty = self.instance.instantiate_mir_and_normalize_erasing_regions(
-                    tcx,
-                    TypingEnv::codegen(tcx, self.instance.def_id()),
-                    EarlyBinder::bind(tcx, place.ty(self.body, tcx)),
-                );
-                Instance::resolve_drop_glue(tcx, ty.ty)
-            }
-            _ => return vec![],
-        };
-
-        vec![Use::for_location(
-            UseKind::Called(call_instance),
-            self.body,
-            terminator.source_info,
-        )]
     }
 
     /// Assuming an [Operand] is a constant function item, resolve it into a monomorphized [Instance].
