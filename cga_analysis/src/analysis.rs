@@ -127,7 +127,7 @@ impl<'a, 'tcx> mir::visit::Visitor<'tcx> for AnalysisNode<'a, 'tcx> {
             let use_ = Use::for_location(
                 UseKind::FnPtrCast(instance),
                 self.body,
-                self.body.source_info(location).clone(),
+                *self.body.source_info(location),
             );
             self.on_edge(use_);
         }
@@ -158,7 +158,7 @@ impl<'a, 'tcx> AnalysisNode<'a, 'tcx> {
                     )
                 });
 
-                if let InstanceKind::Virtual(.., _) = callee_instance.def {
+                if let InstanceKind::Virtual(..) = callee_instance.def {
                     self.state.analyse_virtual(*callee_instance, use_.span);
                 } else {
                     self.state.analyse_instance(*callee_instance);
