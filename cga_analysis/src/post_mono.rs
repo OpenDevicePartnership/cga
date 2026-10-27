@@ -16,12 +16,13 @@
 //! - [MIR Debugging](https://rustc-dev-guide.rust-lang.org/mir/debugging.html)
 
 use rustc_data_structures::{graph::StartNode, unord::UnordSet};
-use rustc_hir::{CoroutineDesugaring, CoroutineKind, def_id::DefId};
+use rustc_hir::{CoroutineDesugaring, CoroutineKind};
 use rustc_log::tracing::*;
+use rustc_middle::mir::Operand;
 use rustc_middle::mir::{self, Body, CastKind, Location, Rvalue, Terminator, TerminatorKind, visit::Visitor as _};
 use rustc_middle::mono::MonoItem;
 use rustc_middle::ty::adjustment::PointerCoercion;
-use rustc_middle::ty::{self, EarlyBinder, GenericArgsRef, Instance, InstanceKind, TyCtxt, TypeFoldable, TypingEnv};
+use rustc_middle::ty::{self, EarlyBinder, Instance, InstanceKind, TyCtxt, TypingEnv};
 use rustc_span::{Span, span_bug};
 use rustc_type_ir::CoroutineArgs;
 
@@ -96,13 +97,9 @@ impl<'b, 'a, 'tcx> PostMonoNode<'b, 'a, 'tcx> {
     fn find_dynamic_cast(&self, rval: &Rvalue<'tcx>) -> Option<(Span, UseKind<'tcx>)> {
         match rval {
             Rvalue::Cast(CastKind::PointerCoercion(PointerCoercion::ReifyFnPointer(_), _), operand, _fn_ptr_ty) => {
-                if let Some((pre_mono_callee, generic_args)) = operand.const_fn_def() {
-                    let call_span = operand.span(self.body);
-                    let callee_instance = self.monomorphize_instance(pre_mono_callee, generic_args, call_span);
-                    Some((call_span, UseKind::FnPtrCast(callee_instance)))
-                } else {
-                    None
-                }
+                let span = operand.span(self.body);
+                self.resolve_fn_operand_opt(operand, span)
+                    .map(|instance| (span, UseKind::FnPtrCast(instance)))
             }
             _ => None,
         }
@@ -191,7 +188,6 @@ impl<'b, 'a, 'tcx> PostMonoNode<'b, 'a, 'tcx> {
         }
 
         let body = state.tcx.instance_mir(instance.def);
-        info!("instanced {instance:?}");
 
         let mut this: PostMonoNode<'_, 'a, 'tcx> = PostMonoNode { instance, body, state };
 
@@ -248,14 +244,18 @@ impl<'b, 'a, 'tcx> PostMonoNode<'b, 'a, 'tcx> {
 
         let call_instance = match &terminator.kind {
             TerminatorKind::Call { func, .. } | TerminatorKind::TailCall { func, .. } => {
-                if let Some((pre_mono_call, generic_args)) = func.const_fn_def() {
-                    self.monomorphize_instance(pre_mono_call, generic_args, span)
+                if let Some(instance) = self.resolve_fn_operand_opt(func, span) {
+                    instance
                 } else {
                     return vec![];
                 }
             }
             TerminatorKind::Drop { place, .. } => {
-                let (ty, _) = self.monomorphize_args(place.ty(self.body, tcx));
+                let ty = self.instance.instantiate_mir_and_normalize_erasing_regions(
+                    tcx,
+                    TypingEnv::codegen(tcx, self.instance.def_id()),
+                    EarlyBinder::bind(tcx, place.ty(self.body, tcx)),
+                );
                 Instance::resolve_drop_glue(tcx, ty.ty)
             }
             _ => return vec![],
@@ -268,27 +268,25 @@ impl<'b, 'a, 'tcx> PostMonoNode<'b, 'a, 'tcx> {
         )]
     }
 
-    fn monomorphize_instance(&self, def_id: DefId, generic_args: GenericArgsRef<'tcx>, span: Span) -> Instance<'tcx> {
-        info!(
-            "monomorphize_instance {def_id:?} {generic_args:?} for {:?}",
-            self.instance
-        );
-        let (mono_args, typing_env) = self.monomorphize_args(generic_args);
-        Instance::expect_resolve(self.state.tcx, typing_env, def_id, mono_args, span)
-    }
-
-    fn monomorphize_args<T>(&self, generic_args: T) -> (T, TypingEnv<'tcx>)
-    where
-        T: TypeFoldable<TyCtxt<'tcx>>,
-    {
-        let tcx = self.state.tcx;
-
-        let env = TypingEnv::codegen(tcx, self.instance.def_id());
-        let args =
-            self.instance
-                .instantiate_mir_and_normalize_erasing_regions(tcx, env, EarlyBinder::bind(tcx, generic_args));
-
-        info!("monomorphize_args OK");
-        (args, env)
+    /// Assuming an [Operand] is a constant function item, resolve it into a monomorphized [Instance].
+    ///
+    /// This is relevant in a Call terminator, or when casting a fn to a ptr.
+    fn resolve_fn_operand_opt(&self, operand: &Operand<'tcx>, span: Span) -> Option<Instance<'tcx>> {
+        if let Some((callee, args)) = operand.const_fn_def() {
+            let ty_env = TypingEnv::codegen(self.state.tcx, self.instance.def_id());
+            Some(Instance::expect_resolve(
+                self.state.tcx,
+                ty_env,
+                callee,
+                self.instance.instantiate_mir_and_normalize_erasing_regions(
+                    self.state.tcx,
+                    ty_env,
+                    EarlyBinder::bind(self.state.tcx, args),
+                ),
+                span,
+            ))
+        } else {
+            None
+        }
     }
 }
