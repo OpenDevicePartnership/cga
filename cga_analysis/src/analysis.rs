@@ -1,20 +1,3 @@
-//! Run a post-mono pass on MIR, possibly from other crates.
-//! In post-mono MIR, all functions are possible to resolve to an [`Instance`].
-//!
-//! This traverses the callgraph along function call edges, starting from mono roots.
-//!
-//! A "mono root" is an externally reachable function, such as `main`, `pub fn`, something with `no_mangle` or `export_name`,
-//! or weird things such as `std::rt::lang_start`.
-//!
-//! There are three functions in play during this pass.
-//! 1. The potentially panicking function being called, which we call the 'callee'.
-//! 2. The generic function being instantiated, *which may not be in the current crate*, called the
-//!    'caller'.
-//! 3. The functions that instantiated it (recursively, back to the mono root).
-//!
-//! ## Recommended reading
-//! - [MIR Debugging](https://rustc-dev-guide.rust-lang.org/mir/debugging.html)
-
 use rustc_data_structures::graph::StartNode;
 use rustc_hir::{CoroutineDesugaring, CoroutineKind};
 use rustc_log::tracing::*;
@@ -29,7 +12,7 @@ use rustc_type_ir::CoroutineArgs;
 use crate::dyn_object::dyn_object_call_to_impl_methods;
 use crate::{Callgraph, Use, UseKind};
 
-/// Context used for analysis for a given root node.
+/// Context used for the entire analysis.
 struct AnalysisState<'tcx> {
     /// Type context.
     tcx: TyCtxt<'tcx>,
@@ -38,21 +21,21 @@ struct AnalysisState<'tcx> {
     callgraph: Callgraph<'tcx>,
 }
 
-/// A node in the post-monomorphisation analysis.
+/// A node in the MIR analysis.
 ///
 /// The MIR is being visited using the Visitor pattern.
-/// Edges in the callgraph are being collected during this analysis.
+/// Roots and edges (and implicitly nodes) in the callgraph
+/// are being registered during this analysis.
 ///
-/// Edges are captured in [Use], and can be
+/// Edges are captured as [Use], and can be
 /// * entrypoints
 /// * explicit functions calls
 /// * implicit possible function calls
 /// * implicit panics like asserts and those found in async
 ///
-/// For each call-like structure, the callee [Instance] and its [Body] are resolved and analysed.
-/// A node facilitates the analysis of that [Body],
-/// by keeping the analysis context for that [Body] around.
-struct PostMonoNode<'a, 'tcx> {
+/// For each call-like structure, the callee [Instance] and its [Body] are resolved to a Node,
+/// and analysis proceeds recursively on the MIR of that [Body] using the [mir::visit::Visitor].
+struct AnalysisNode<'a, 'tcx> {
     /// The [Instance] currently being analysed.
     instance: Instance<'tcx>,
 
@@ -63,10 +46,29 @@ struct PostMonoNode<'a, 'tcx> {
     state: &'a mut AnalysisState<'tcx>,
 }
 
-/// Analyse the MIR items recursively, starting from root nodes collected by `rustc_monomorphize`.
+/// Extract the Callgraph from what should be considered 'root' items in the current crate.
+/// 
+/// These include:
+/// * entrypoints like fn main() when this crate is a binary
+/// * extern "C" fn's or those that are no_mangle
 ///
-/// During the analysis the results are added to a common [Callgraph] struct and finally returned.
-pub fn generate_callgraph<'tcx>(tcx: TyCtxt<'tcx>, roots: Vec<MonoItem<'tcx>>) -> Callgraph<'tcx> {
+/// Walks over the MIR tree from these root nodes and collects any function calls and assertions.
+///
+/// Can only be run once 'collect_and_partition_mono_items' pass has run.
+pub fn extract_from_roots<'tcx>(tcx: TyCtxt<'tcx>) -> Callgraph<'tcx> {
+    let roots = crate::monomorphize::collect_roots(
+            tcx,
+            crate::monomorphize::MonoItemCollectionStrategy::NoConstOrStatic,
+        );
+    extract(tcx, roots)
+}
+
+/// Extract the Callgraph with a series of [MonoItem]s as root nodes.
+/// 
+/// Walks over the MIR tree from these root nodes and collects any function calls and assertions.
+/// 
+/// Can only be run once 'collect_and_partition_mono_items' pass has run.
+pub fn extract<'tcx>(tcx: TyCtxt<'tcx>, roots: Vec<MonoItem<'tcx>>) -> Callgraph<'tcx> {
     let mut state = AnalysisState {
         tcx,
         callgraph: Callgraph::new(),
@@ -84,7 +86,7 @@ pub fn generate_callgraph<'tcx>(tcx: TyCtxt<'tcx>, roots: Vec<MonoItem<'tcx>>) -
     state.callgraph
 }
 
-impl<'a, 'tcx> mir::visit::Visitor<'tcx> for PostMonoNode<'a, 'tcx> {
+impl<'a, 'tcx> mir::visit::Visitor<'tcx> for AnalysisNode<'a, 'tcx> {
     fn visit_terminator(&mut self, terminator: &Terminator<'tcx>, location: Location) {
         for use_ in self.get_call_def_mir(terminator) {
             self.on_edge(use_);
@@ -109,7 +111,7 @@ impl<'a, 'tcx> mir::visit::Visitor<'tcx> for PostMonoNode<'a, 'tcx> {
     }
 }
 
-impl<'a, 'tcx> PostMonoNode<'a, 'tcx> {
+impl<'a, 'tcx> AnalysisNode<'a, 'tcx> {
     fn find_dynamic_cast(&self, rval: &Rvalue<'tcx>) -> Option<(Span, UseKind<'tcx>)> {
         match rval {
             Rvalue::Cast(CastKind::PointerCoercion(PointerCoercion::ReifyFnPointer(_), _), operand, _fn_ptr_ty) => {
@@ -237,7 +239,7 @@ impl<'tcx> AnalysisState<'tcx> {
 
         let body = self.tcx.instance_mir(instance.def);
 
-        let mut this: PostMonoNode<'_, 'tcx> = PostMonoNode {
+        let mut this: AnalysisNode<'_, 'tcx> = AnalysisNode {
             instance,
             body,
             state: self,

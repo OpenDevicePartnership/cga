@@ -31,7 +31,7 @@ mod panics;
 
 pub mod diagnostics;
 pub mod monomorphize;
-pub mod post_mono;
+pub mod analysis;
 
 use rustc_hir::{HirId, def_id::DefId};
 use rustc_lint_defs::declare_tool_lint;
