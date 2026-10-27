@@ -1,4 +1,7 @@
-//! A shallow fork of [`rustc_monomorphize`].
+//! A shallow fork of [`rustc_monomorphize`] with minor changes.
+//!
+//! Copyright Rust Language Developers
+//! Licensed under MIT/Apache
 //!
 //! We need to use [`collect_roots`] for our analysis pass, but this function is not exposed by [`rustc_monomorphize`].
 //! Instead we have forked the crate to regain the same functionality.
