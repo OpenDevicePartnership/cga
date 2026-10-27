@@ -27,7 +27,16 @@ use rustc_span::{Span, span_bug};
 use rustc_type_ir::CoroutineArgs;
 
 use crate::dyn_object::dyn_object_call_to_impl_methods;
-use crate::{AnalysisState, Callgraph, Use, UseKind};
+use crate::{Callgraph, Use, UseKind};
+
+/// Context used for analysis for a given root node.
+struct AnalysisState<'tcx> {
+    /// Type context.
+    tcx: TyCtxt<'tcx>,
+
+    /// The callgraph currently being constructed.
+    callgraph: Callgraph<'tcx>,
+}
 
 /// A node in the post-monomorphisation analysis.
 ///
@@ -134,8 +143,8 @@ impl<'a, 'tcx> PostMonoNode<'a, 'tcx> {
                     )
                 });
 
-                if matches!(callee_instance.def, InstanceKind::Virtual(..)) {
-                    self.visit_virtual(*callee_instance, use_.span);
+                if let InstanceKind::Virtual(.., _) = callee_instance.def {
+                    self.state.analyse_virtual(*callee_instance, use_.span);
                 } else {
                     self.state.analyse_instance(*callee_instance);
                 }
@@ -146,34 +155,6 @@ impl<'a, 'tcx> PostMonoNode<'a, 'tcx> {
                     "Entrypoint is a root node of the graph, and cannot be logically generated mid-analysis"
                 );
             }
-        }
-    }
-
-    fn visit_virtual(&mut self, instance: Instance<'tcx>, span: Span) {
-        let InstanceKind::Virtual(virtual_def_id, _) = instance.def else {
-            span_bug!(self.body.span, "Visiting a non-virtual {instance:?}");
-        };
-
-        if !self.state.callgraph.visit(instance) {
-            debug!("already linted {instance:?}");
-            return;
-        }
-
-        info!("visiting virtual {instance:?}");
-
-        let mut this: PostMonoNode<'_, 'tcx> = PostMonoNode {
-            instance,
-            body: self.body, // Re-use old body
-            state: self.state,
-        };
-
-        for method in dyn_object_call_to_impl_methods(virtual_def_id, this.instance.args, this.state.tcx) {
-            // Add a 'fake' use to each of the VTable entries.
-            this.on_edge(Use {
-                kind: UseKind::VTableCalled(method),
-                hir_id: None,
-                span,
-            });
         }
     }
 
@@ -305,6 +286,28 @@ impl<'tcx> AnalysisState<'tcx> {
             for (bb, data) in mir::traversal::preorder(body) {
                 this.visit_basic_block_data(bb, data);
             }
+        }
+    }
+
+    /// When a MIR Call (or call-like operation like casting as a fnptr) to a virtual fn is performed,
+    /// visit all the [Instance]s that possibly implement that trait fn.
+    fn analyse_virtual(&mut self, instance: Instance<'tcx>, span: Span) {
+        let InstanceKind::Virtual(virtual_def_id, _) = instance.def else {
+            span_bug!(span, "Visiting a non-virtual {instance:?}");
+        };
+
+        if !self.callgraph.visit(instance) {
+            return;
+        }
+
+        for method in dyn_object_call_to_impl_methods(virtual_def_id, instance.args, self.tcx) {
+            // Add a 'fake' use to each of the VTable entries.
+            self.callgraph.register_edge(instance, Use {
+                kind: UseKind::VTableCalled(method),
+                hir_id: None,
+                span,
+            });
+            self.analyse_instance(method);
         }
     }
 }

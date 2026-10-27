@@ -37,7 +37,7 @@ use rustc_hir::{HirId, def_id::DefId};
 use rustc_lint_defs::declare_tool_lint;
 use rustc_middle::{
     mir::{Body, SourceInfo},
-    ty::{Instance, TyCtxt, print::with_resolve_crate_name},
+    ty::{Instance, print::with_resolve_crate_name},
 };
 use rustc_span::Span;
 
@@ -57,24 +57,7 @@ declare_tool_lint! {
     report_in_external_macro: true
 }
 
-// for intra-doc links
-#[rustfmt::skip]
-#[allow(unused_imports)]
-use rustc_middle::{
-    mir::TerminatorKind,
-    ty::{GenericArgsRef, ParamEnv},
-};
-
 use crate::callgraph::Callgraph;
-
-/// Context used for analysis for a given root node.
-struct AnalysisState<'tcx> {
-    /// Type context.
-    tcx: TyCtxt<'tcx>,
-
-    /// The callgraph currently being constructed.
-    callgraph: Callgraph<'tcx>,
-}
 
 /// A Use of a function or a panic.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
