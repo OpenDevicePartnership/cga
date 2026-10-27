@@ -101,17 +101,13 @@ impl<'b, 'a, 'tcx> PostMonoNode<'b, 'a, 'tcx> {
     fn find_dynamic_cast(&self, rval: &Rvalue<'tcx>) -> Option<(Span, UseKind<'tcx>)> {
         match rval {
             Rvalue::Cast(CastKind::PointerCoercion(PointerCoercion::ReifyFnPointer(_), _), operand, _fn_ptr_ty) => {
-                let call_span = operand.span(self.body);
-                let Some((pre_mono_callee, generic_args)) = operand.const_fn_def() else {
-                    span_bug!(
-                        call_span,
-                        "don't know how to handle ReifyFnPointer cast of non-constant fn {operand:?}"
-                    );
-                };
-
-                let callee_instance = self.monomorphize_instance(pre_mono_callee, generic_args, call_span);
-
-                Some((call_span, UseKind::FnPtrCast(callee_instance)))
+                if let Some((pre_mono_callee, generic_args)) = operand.const_fn_def() {
+                    let call_span = operand.span(self.body);
+                    let callee_instance = self.monomorphize_instance(pre_mono_callee, generic_args, call_span);
+                    Some((call_span, UseKind::FnPtrCast(callee_instance)))
+                } else {
+                    None
+                }
             }
             _ => None,
         }
