@@ -28,17 +28,20 @@ impl<'tcx> Callgraph<'tcx> {
     }
 
     pub fn register_root(&mut self, instance: Instance<'tcx>, tcx: TyCtxt<'tcx>) {
-        let root_node = instance.def_id().expect_local();
-        let hir_id = tcx.local_def_id_to_hir_id(root_node);
-        let span = tcx.hir_span(hir_id);
+        // Only collect local root nodes.
+        // This excludes tcx.lang_items().start_fn(), which is never local.
+        if let Some(root_node) = instance.def_id().as_local() {
+            let hir_id = tcx.local_def_id_to_hir_id(root_node);
+            let span = tcx.hir_span(hir_id);
 
-        let use_ = Use {
-            kind: UseKind::Entrypoint(instance),
-            span,
-            hir_id: Some(hir_id),
-        };
+            let use_ = Use {
+                kind: UseKind::Entrypoint(instance),
+                span,
+                hir_id: Some(hir_id),
+            };
 
-        self.roots.insert(use_);
+            self.roots.insert(use_);
+        }
     }
 
     pub fn register_edge(&mut self, from: Instance<'tcx>, to: Use<'tcx>) {

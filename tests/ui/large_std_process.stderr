@@ -1,22 +1,3 @@
-error: call to associated function `std::process::Command::new` which can panic
-  --> tests/ui/large_std_process.rs:2:13
-   |
-LL |     let _ = std::process::Command::new("evil");
-   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
-   = note: 11 different panics from this location
-   = note: backtrace (1 of 2021126033):
-           0: std::rt::panic_fmt (called)
-           1: alloc::raw_vec::RawVec::<u8>::into_box (called)
-           2: std::vec::Vec::<u8>::into_boxed_slice (called)
-           3: <std::boxed::Box<[u8]> as std::clone::Clone>::clone (called)
-           4: <std::ffi::CString as std::clone::Clone>::clone (called)
-           5: std::sys::process::unix::common::Command::new (called)
-           6: std::process::Command::new::<&str> (called) <--
-           7: large_std_process::test (called)
-           8: large_std_process::main (entrypoint)
-   = note: `#[deny(cga::panics)]` on by default
-
 error: call to drop of `std::process::Command` which can panic
   --> tests/ui/large_std_process.rs:2:47
    |
@@ -35,6 +16,25 @@ LL |     let _ = std::process::Command::new("evil");
            7: drop of `std::process::Command` (called) <--
            8: large_std_process::test (called)
            9: large_std_process::main (entrypoint)
+   = note: `#[deny(cga::panics)]` on by default
+
+error: call to associated function `std::process::Command::new` which can panic
+  --> tests/ui/large_std_process.rs:2:13
+   |
+LL |     let _ = std::process::Command::new("evil");
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: 11 different panics from this location
+   = note: backtrace (1 of 2021126033):
+           0: std::rt::panic_fmt (called)
+           1: alloc::raw_vec::RawVec::<u8>::into_box (called)
+           2: std::vec::Vec::<u8>::into_boxed_slice (called)
+           3: <std::boxed::Box<[u8]> as std::clone::Clone>::clone (called)
+           4: <std::ffi::CString as std::clone::Clone>::clone (called)
+           5: std::sys::process::unix::common::Command::new (called)
+           6: std::process::Command::new::<&str> (called) <--
+           7: large_std_process::test (called)
+           8: large_std_process::main (entrypoint)
 
 error: aborting due to 2 previous errors
 

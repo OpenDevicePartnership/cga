@@ -52,24 +52,10 @@ pub fn generate_callgraph<'tcx>(tcx: TyCtxt<'tcx>, roots: UnordSet<MonoItem<'tcx
     let roots = tcx.with_stable_hashing_context(move |mut hcx| roots.into_sorted(&mut hcx, true));
     for root in roots {
         let instance = match root {
-            // global asm is always an exported constraint
-            MonoItem::GlobalAsm(..) => continue,
-            // NOTE: `mono` panics if item has generics rather than silently doing the wrong thing
             MonoItem::Static(def_id) => Instance::mono(tcx, def_id),
-            MonoItem::Fn(instance) => {
-                let def = instance.def_id();
-
-                // Skip std::rt::lang_start. Technically we could lint on it as if it were the span
-                // of `main`, but the lint would never be useful.
-                // Note that we may not have `lang_start` yet if we're still compiling core.
-                if Some(def) == tcx.lang_items().start_fn() {
-                    continue;
-                }
-
-                instance
-            }
+            MonoItem::Fn(instance) => instance,
+            _ => continue,
         };
-        debug!("linting root: {instance:?}");
         let mut state = AnalysisState {
             tcx,
             callgraph: &mut callgraph,
