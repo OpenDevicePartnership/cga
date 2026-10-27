@@ -178,27 +178,15 @@ impl<'b, 'a, 'tcx> PostMonoNode<'b, 'a, 'tcx> {
 
         let owner = instance.def_id();
 
-        if let Some(intrinsic) = state.tcx.intrinsic(owner) {
-            if intrinsic.must_be_overridden {
-                // Instrinsics with no fallback body are qualified as part of the compiler,
-                // and will panic in `instance_mir`.
-                debug!("ignoring intrinsic {owner:?}");
-                return;
-            }
-
-            // See equivalent code in `rustc_monomorphize::collector::visit_instance_use`.
-            if state.tcx.sess.replaced_intrinsics.contains(&intrinsic.name) {
-                // This is normal: LLVM in particular has specialized overrides for many
-                // integer operations. But that means the fallback body won't actually be
-                // used, so don't try to check it.
-                debug!("ignoring overridden intrinsic body for {owner:?}");
-                return;
-            }
-
-            debug!("using fallback body for {owner:?}");
+        if state.tcx.intrinsic(owner).is_some() {
+            // When it is an intrinsic, build new raw instance for it.
             instance = ty::Instance::new_raw(owner, instance.args);
-        } else if !state.tcx.is_mir_available(owner) {
-            info!("no MIR for {owner:?}");
+        }
+
+        if !state.tcx.is_mir_available(owner) {
+            // Ignore if MIR is not available for the current process.
+            // Possibly other process for dependency crate will generate the callgraph for this call,
+            // which will be merged later.
             return;
         }
 
