@@ -68,22 +68,12 @@ use rustc_middle::{
 use crate::callgraph::Callgraph;
 
 /// Context used for analysis for a given root node.
-struct AnalysisState<'a, 'tcx> {
+struct AnalysisState<'tcx> {
     /// Type context.
     tcx: TyCtxt<'tcx>,
 
     /// The callgraph currently being constructed.
-    callgraph: &'a mut Callgraph<'tcx>,
-}
-
-impl<'tcx> AnalysisState<'_, 'tcx> {
-    pub fn register_root(&mut self, instance: Instance<'tcx>) {
-        self.callgraph.register_root(instance, self.tcx);
-    }
-
-    pub fn register_edge(&mut self, from: Instance<'tcx>, to: Use<'tcx>) {
-        self.callgraph.register_edge(from, to);
-    }
+    callgraph: Callgraph<'tcx>,
 }
 
 /// A Use of a function or a panic.

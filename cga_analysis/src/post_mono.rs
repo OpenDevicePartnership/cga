@@ -15,7 +15,7 @@
 //! ## Recommended reading
 //! - [MIR Debugging](https://rustc-dev-guide.rust-lang.org/mir/debugging.html)
 
-use rustc_data_structures::{graph::StartNode, unord::UnordSet};
+use rustc_data_structures::graph::StartNode;
 use rustc_hir::{CoroutineDesugaring, CoroutineKind};
 use rustc_log::tracing::*;
 use rustc_middle::mir::Operand;
@@ -30,7 +30,7 @@ use crate::dyn_object::dyn_object_call_to_impl_methods;
 use crate::{AnalysisState, Callgraph, Use, UseKind};
 
 /// A node in the post-monomorphisation analysis.
-struct PostMonoNode<'b, 'a, 'tcx> {
+struct PostMonoNode<'a, 'tcx> {
     /// The function we are currently traversing.
     instance: Instance<'tcx>,
 
@@ -38,37 +38,31 @@ struct PostMonoNode<'b, 'a, 'tcx> {
     body: &'tcx Body<'tcx>,
 
     // The global analysis context.
-    state: &'b mut AnalysisState<'a, 'tcx>,
+    state: &'a mut AnalysisState<'tcx>,
 }
 
-/// Analyse all used items recursively, starting from roots.
-pub fn generate_callgraph<'tcx>(tcx: TyCtxt<'tcx>, roots: UnordSet<MonoItem<'tcx>>) -> Callgraph<'tcx> {
-    trace!("all roots: {roots:?}");
-
-    let mut callgraph = Callgraph::new();
-
-    // We need to sort these for query stability.
-    let roots = tcx.with_stable_hashing_context(move |mut hcx| roots.into_sorted(&mut hcx, true));
+/// Analyse the MIR items recursively, starting from root nodes collected by `rustc_monomorphize`.
+///
+/// During the analysis the results are added to a common [Callgraph] struct and finally returned.
+pub fn generate_callgraph<'tcx>(tcx: TyCtxt<'tcx>, roots: Vec<MonoItem<'tcx>>) -> Callgraph<'tcx> {
+    let mut state = AnalysisState {
+        tcx,
+        callgraph: Callgraph::new(),
+    };
     for root in roots {
         let instance = match root {
             MonoItem::Static(def_id) => Instance::mono(tcx, def_id),
             MonoItem::Fn(instance) => instance,
             _ => continue,
         };
-        let mut state = AnalysisState {
-            tcx,
-            callgraph: &mut callgraph,
-        };
-
-        state.register_root(instance);
-
+        state.callgraph.register_root(instance, state.tcx);
         PostMonoNode::visit_instance(&mut state, instance);
     }
 
-    callgraph
+    state.callgraph
 }
 
-impl<'b, 'a, 'tcx> mir::visit::Visitor<'tcx> for PostMonoNode<'b, 'a, 'tcx> {
+impl<'a, 'tcx> mir::visit::Visitor<'tcx> for PostMonoNode<'a, 'tcx> {
     fn visit_terminator(&mut self, terminator: &Terminator<'tcx>, location: Location) {
         for use_ in self.get_call_def_mir(terminator) {
             self.on_edge(use_);
@@ -93,7 +87,7 @@ impl<'b, 'a, 'tcx> mir::visit::Visitor<'tcx> for PostMonoNode<'b, 'a, 'tcx> {
     }
 }
 
-impl<'b, 'a, 'tcx> PostMonoNode<'b, 'a, 'tcx> {
+impl<'a, 'tcx> PostMonoNode<'a, 'tcx> {
     fn find_dynamic_cast(&self, rval: &Rvalue<'tcx>) -> Option<(Span, UseKind<'tcx>)> {
         match rval {
             Rvalue::Cast(CastKind::PointerCoercion(PointerCoercion::ReifyFnPointer(_), _), operand, _fn_ptr_ty) => {
@@ -109,7 +103,7 @@ impl<'b, 'a, 'tcx> PostMonoNode<'b, 'a, 'tcx> {
     ///
     /// An edge is a [`Use`] in the definition of a monomorphized [`Instance`].
     fn on_edge(&mut self, use_: Use<'tcx>) {
-        self.state.register_edge(self.instance, use_.clone());
+        self.state.callgraph.register_edge(self.instance, use_.clone());
 
         match use_.kind {
             UseKind::BuiltinMirAssert | UseKind::AsyncPanic => {
@@ -152,7 +146,7 @@ impl<'b, 'a, 'tcx> PostMonoNode<'b, 'a, 'tcx> {
 
         info!("visiting virtual {instance:?}");
 
-        let mut this: PostMonoNode<'_, 'a, 'tcx> = PostMonoNode {
+        let mut this: PostMonoNode<'_, 'tcx> = PostMonoNode {
             instance,
             body: self.body, // Re-use old body
             state: self.state,
@@ -168,7 +162,7 @@ impl<'b, 'a, 'tcx> PostMonoNode<'b, 'a, 'tcx> {
         }
     }
 
-    fn visit_instance(state: &mut AnalysisState<'a, 'tcx>, mut instance: Instance<'tcx>) {
+    fn visit_instance(state: &mut AnalysisState<'tcx>, mut instance: Instance<'tcx>) {
         if !state.callgraph.visit(instance) {
             return;
         }
@@ -189,7 +183,7 @@ impl<'b, 'a, 'tcx> PostMonoNode<'b, 'a, 'tcx> {
 
         let body = state.tcx.instance_mir(instance.def);
 
-        let mut this: PostMonoNode<'_, 'a, 'tcx> = PostMonoNode { instance, body, state };
+        let mut this: PostMonoNode<'_, 'tcx> = PostMonoNode { instance, body, state };
 
         if let Some(CoroutineKind::Desugared(CoroutineDesugaring::Async, _)) = body.coroutine_kind() {
             // TODO this implementation block is fragile.
