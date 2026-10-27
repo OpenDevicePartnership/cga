@@ -30,14 +30,27 @@ use crate::dyn_object::dyn_object_call_to_impl_methods;
 use crate::{AnalysisState, Callgraph, Use, UseKind};
 
 /// A node in the post-monomorphisation analysis.
+///
+/// The MIR is being visited using the Visitor pattern.
+/// Edges in the callgraph are being collected during this analysis.
+///
+/// Edges are captured in [Use], and can be
+/// * entrypoints
+/// * explicit functions calls
+/// * implicit possible function calls
+/// * implicit panics like asserts and those found in async
+///
+/// For each call-like structure, the callee [Instance] and its [Body] are resolved and analysed.
+/// A node facilitates the analysis of that [Body],
+/// by keeping the analysis context for that [Body] around.
 struct PostMonoNode<'a, 'tcx> {
-    /// The function we are currently traversing.
+    /// The [Instance] currently being analysed.
     instance: Instance<'tcx>,
 
-    /// Its body.
+    /// The [Body] belonging to that [Instance].
     body: &'tcx Body<'tcx>,
 
-    // The global analysis context.
+    /// A reference to the global [AnalysisState].
     state: &'a mut AnalysisState<'tcx>,
 }
 
@@ -56,7 +69,7 @@ pub fn generate_callgraph<'tcx>(tcx: TyCtxt<'tcx>, roots: Vec<MonoItem<'tcx>>) -
             _ => continue,
         };
         state.callgraph.register_root(instance, state.tcx);
-        PostMonoNode::visit_instance(&mut state, instance);
+        state.analyse_instance(instance);
     }
 
     state.callgraph
@@ -102,6 +115,8 @@ impl<'a, 'tcx> PostMonoNode<'a, 'tcx> {
     /// On MIR callgraph edge.
     ///
     /// An edge is a [`Use`] in the definition of a monomorphized [`Instance`].
+    ///
+    /// Will recurse the analysis if the [`Use`] is a call-like operation.
     fn on_edge(&mut self, use_: Use<'tcx>) {
         self.state.callgraph.register_edge(self.instance, use_.clone());
 
@@ -122,7 +137,7 @@ impl<'a, 'tcx> PostMonoNode<'a, 'tcx> {
                 if matches!(callee_instance.def, InstanceKind::Virtual(..)) {
                     self.visit_virtual(*callee_instance, use_.span);
                 } else {
-                    PostMonoNode::visit_instance(self.state, *callee_instance);
+                    self.state.analyse_instance(*callee_instance);
                 }
             }
             UseKind::Entrypoint(..) => {
@@ -159,75 +174,6 @@ impl<'a, 'tcx> PostMonoNode<'a, 'tcx> {
                 hir_id: None,
                 span,
             });
-        }
-    }
-
-    fn visit_instance(state: &mut AnalysisState<'tcx>, mut instance: Instance<'tcx>) {
-        if !state.callgraph.visit(instance) {
-            return;
-        }
-
-        let owner = instance.def_id();
-
-        if state.tcx.intrinsic(owner).is_some() {
-            // When it is an intrinsic, build new raw instance for it.
-            instance = ty::Instance::new_raw(owner, instance.args);
-        }
-
-        if !state.tcx.is_mir_available(owner) {
-            // Ignore if MIR is not available for the current process.
-            // Possibly other process for dependency crate will generate the callgraph for this call,
-            // which will be merged later.
-            return;
-        }
-
-        let body = state.tcx.instance_mir(instance.def);
-
-        let mut this: PostMonoNode<'_, 'tcx> = PostMonoNode { instance, body, state };
-
-        if let Some(CoroutineKind::Desugared(CoroutineDesugaring::Async, _)) = body.coroutine_kind() {
-            // TODO this implementation block is fragile.
-            debug!("visiting (async coroutine) {instance:#?} {body:#?}");
-
-            // Visit all BB's associated with Unresumed discriminators.
-            // Do not visit "Returned" and "Panicked" discriminator bb's, instead emit a UseKind::AsyncPanic
-            // BB0 is the switch statement
-
-            let switch_bb = &body[body.basic_blocks.start_node()];
-            let TerminatorKind::SwitchInt { targets, .. } = &switch_bb.terminator().kind else {
-                span_bug!(
-                    body.span,
-                    "Expected async coroutine with a switch for the discriminator in the first basic block"
-                );
-            };
-
-            for (value, bb) in targets.iter() {
-                const RETURNED: u128 = <CoroutineArgs<TyCtxt<'_>> as ty::CoroutineArgsExt>::RETURNED as u128;
-                const POISONED: u128 = <CoroutineArgs<TyCtxt<'_>> as ty::CoroutineArgsExt>::POISONED as u128;
-
-                match value {
-                    RETURNED => {
-                        let data = &body[bb];
-                        let source_info = data.terminator().source_info;
-
-                        this.on_edge(Use::for_location(UseKind::AsyncPanic, body, source_info));
-                    }
-                    POISONED => {} // Ignore
-                    _ => {
-                        for (bb, data) in mir::traversal::Preorder::new(body, bb) {
-                            this.visit_basic_block_data(bb, data);
-                        }
-                    }
-                }
-            }
-
-            // TODO coroutine drop?
-        } else {
-            // TODO instead of directly traversing the MIR, try to const_eval any calls to eliminate unreachable SwitchInt branches.
-            debug!("visiting (normal preorder) {instance:#?}");
-            for (bb, data) in mir::traversal::preorder(body) {
-                this.visit_basic_block_data(bb, data);
-            }
         }
     }
 
@@ -281,6 +227,84 @@ impl<'a, 'tcx> PostMonoNode<'a, 'tcx> {
             ))
         } else {
             None
+        }
+    }
+}
+
+impl<'tcx> AnalysisState<'tcx> {
+    /// When a MIR Call (or call-like operation like casting as a fnptr) is performed, visit the [Instance].
+    ///
+    /// This creates a new [PostMonoNode] and continues the analysis recursively.
+    fn analyse_instance(&mut self, mut instance: Instance<'tcx>) {
+        if !self.callgraph.visit(instance) {
+            return;
+        }
+
+        let owner = instance.def_id();
+
+        if self.tcx.intrinsic(owner).is_some() {
+            // When it is an intrinsic, build new raw instance for it.
+            instance = ty::Instance::new_raw(owner, instance.args);
+        }
+
+        if !self.tcx.is_mir_available(owner) {
+            // Ignore if MIR is not available for the current process.
+            // Possibly other process for dependency crate will generate the callgraph for this call,
+            // which will be merged later.
+            return;
+        }
+
+        let body = self.tcx.instance_mir(instance.def);
+
+        let mut this: PostMonoNode<'_, 'tcx> = PostMonoNode {
+            instance,
+            body,
+            state: self,
+        };
+
+        if let Some(CoroutineKind::Desugared(CoroutineDesugaring::Async, _)) = body.coroutine_kind() {
+            // TODO this implementation block is fragile.
+            debug!("visiting (async coroutine) {instance:#?} {body:#?}");
+
+            // Visit all BB's associated with Unresumed discriminators.
+            // Do not visit "Returned" and "Panicked" discriminator bb's, instead emit a UseKind::AsyncPanic
+            // BB0 is the switch statement
+
+            let switch_bb = &body[body.basic_blocks.start_node()];
+            let TerminatorKind::SwitchInt { targets, .. } = &switch_bb.terminator().kind else {
+                span_bug!(
+                    body.span,
+                    "Expected async coroutine with a switch for the discriminator in the first basic block"
+                );
+            };
+
+            for (value, bb) in targets.iter() {
+                const RETURNED: u128 = <CoroutineArgs<TyCtxt<'_>> as ty::CoroutineArgsExt>::RETURNED as u128;
+                const POISONED: u128 = <CoroutineArgs<TyCtxt<'_>> as ty::CoroutineArgsExt>::POISONED as u128;
+
+                match value {
+                    RETURNED => {
+                        let data = &body[bb];
+                        let source_info = data.terminator().source_info;
+
+                        this.on_edge(Use::for_location(UseKind::AsyncPanic, body, source_info));
+                    }
+                    POISONED => {} // Ignore
+                    _ => {
+                        for (bb, data) in mir::traversal::Preorder::new(body, bb) {
+                            this.visit_basic_block_data(bb, data);
+                        }
+                    }
+                }
+            }
+
+            // TODO coroutine drop?
+        } else {
+            // TODO instead of directly traversing the MIR, try to const_eval any calls to eliminate unreachable SwitchInt branches.
+            debug!("visiting (normal preorder) {instance:#?}");
+            for (bb, data) in mir::traversal::preorder(body) {
+                this.visit_basic_block_data(bb, data);
+            }
         }
     }
 }
