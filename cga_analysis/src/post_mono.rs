@@ -270,34 +270,15 @@ impl<'b, 'a, 'tcx> PostMonoNode<'b, 'a, 'tcx> {
 
         let call_instance = match &terminator.kind {
             TerminatorKind::Call { func, .. } | TerminatorKind::TailCall { func, .. } => {
-                let Some((pre_mono_call, generic_args)) = func.const_fn_def() else {
-                    match func.ty(self.body, tcx).kind() {
-                        kind @ ty::FnDef(..) => {
-                            span_bug!(span, "{kind:?} should have been a const_fn_def?")
-                        }
-                        ty::FnPtr(..) => {}
-                        _ => {
-                            // If this is anything other than a function item, it can't have generics and
-                            // therefore must have been checked by the THIR pass.
-                            // FIXME: are we sure is this true when we're passed an `impl Fn`?
-                            tcx.dcx()
-                                .span_delayed_bug(span, format!("called a non-function? {func:?}"));
-                        }
-                    }
-                    debug!("ignoring call to non-constant function {func:?}");
+                if let Some((pre_mono_call, generic_args)) = func.const_fn_def() {
+                    self.monomorphize_instance(pre_mono_call, generic_args, span)
+                } else {
                     return vec![];
-                };
-                self.monomorphize_instance(pre_mono_call, generic_args, span)
+                }
             }
             TerminatorKind::Drop { place, .. } => {
                 let (ty, _) = self.monomorphize_args(place.ty(self.body, tcx));
-                let instance = Instance::resolve_drop_glue(tcx, ty.ty);
-                if matches!(instance.def, InstanceKind::Shim(ShimKind::DropGlue(_, None))) {
-                    debug!("ty `{ty:?}` does not need to be dropped");
-                    return vec![];
-                }
-                debug!("resolve drop glue => instance={instance:?}, ty={ty:?}");
-                instance
+                Instance::resolve_drop_glue(tcx, ty.ty)
             }
             _ => return vec![],
         };
