@@ -69,14 +69,11 @@ pub fn generate_callgraph<'tcx>(tcx: TyCtxt<'tcx>, roots: UnordSet<MonoItem<'tcx
 
 impl<'b, 'a, 'tcx> mir::visit::Visitor<'tcx> for PostMonoNode<'b, 'a, 'tcx> {
     fn visit_terminator(&mut self, terminator: &Terminator<'tcx>, location: Location) {
-        debug!("visit_terminator");
         for use_ in self.get_call_def_mir(terminator) {
-            debug!("visit_terminator def mir {use_:#?}");
             self.on_edge(use_);
         }
 
         if let TerminatorKind::Assert { .. } = terminator.kind {
-            debug!("visit_terminator assert");
             let use_ = Use::for_location(UseKind::BuiltinMirAssert, self.body, terminator.source_info);
             self.on_edge(use_);
         }
@@ -115,8 +112,6 @@ impl<'b, 'a, 'tcx> PostMonoNode<'b, 'a, 'tcx> {
     ///
     /// An edge is a [`Use`] in the definition of a monomorphized [`Instance`].
     fn on_edge(&mut self, use_: Use<'tcx>) {
-        info!("edge {:#?} {use_:#?}", self.instance);
-
         self.state.register_edge(self.instance, use_.clone());
 
         match use_.kind {
@@ -178,11 +173,8 @@ impl<'b, 'a, 'tcx> PostMonoNode<'b, 'a, 'tcx> {
 
     fn visit_instance(state: &mut AnalysisState<'a, 'tcx>, mut instance: Instance<'tcx>) {
         if !state.callgraph.visit(instance) {
-            debug!("already linted {instance:?}");
             return;
         }
-
-        info!("visiting {instance:?}");
 
         let owner = instance.def_id();
 
