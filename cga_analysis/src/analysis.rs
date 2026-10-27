@@ -199,7 +199,9 @@ impl<'a, 'tcx> AnalysisNode<'a, 'tcx> {
 impl<'tcx> AnalysisState<'tcx> {
     /// When a MIR Call (or call-like operation like casting as a fnptr) is performed, visit the [Instance].
     ///
-    /// This creates a new [PostMonoNode] and continues the analysis recursively.
+    /// Visiting involves fetching the `body` associated with the instance,
+    /// and checking if it requires special consideration as an async block.
+    /// Finally a new [AnalysisNode] is created, and the [mir::visit::Visitor] is called using the preorder.
     fn analyse_instance(&mut self, mut instance: Instance<'tcx>) {
         if !self.callgraph.visit(instance) {
             return;
