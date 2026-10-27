@@ -11,7 +11,13 @@ This tool also supports a separate configuration file in which specific function
 ⚠️ **Warning**: CGA is inherently a bit fragile as it is not maintained in lockstep with rustc (like clippy is for example), and it is not exhaustively tested on various crates (like rustc and clippy are). Please create an issue if your project can not be analysed using this tool, or if the callgraph exported is incorrect.
 
 ## Attribution
-Based on a blog by [Jyn](https://jyn.dev/rustc-driver/) and completely forked parts of [rustc](https://github.com/rust-lang/rust) and [ferrocene](https://github.com/ferrocene/ferrocene/tree/main/compiler).
+This project could be created in part because of the following:
+* Inspired by the blog by Jyn on [rustc-driver](https://jyn.dev/rustc-driver/).
+* Inspired by [Clippy](https://github.com/rust-lang/rust-clippy) and parts of the UI testing are used by CGA.
+* MIR analysis started out as a fork of [ferrocene](https://github.com/ferrocene/ferrocene/tree/main/compiler). However CGA works quite differently now, and no code of Ferrocene is left.
+* Peeked a lot in [rustc](https://github.com/rust-lang/rust) code to figure out how things are done, and of course CGA depends on a large chunk of rustc directly.
+* [rustc_monomorphize](https://github.com/rust-lang/rust/tree/main/compiler/rustc_monomorphize/src) was copied over and adapted for CGA. (internals are not part of the public API of rustc)
+* [breadth-first search](https://github.com/evenfurther/pathfinding/blob/d9971751329d3526026d5b170076c71efb127eeb/src/directed/bfs.rs) from the [pathfinding](https://crates.io/crates/pathfinding) crate was copied over and adapted to the graph structures used in CGA.
 
 ## Alternatives
 CGA extracts the callgraph directly from MIR as a rustc-driver. That approach can work well to detect panics, but it is not the only way to achieve it. All approaches come with varying up- and down-sides.
