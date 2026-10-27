@@ -1,9 +1,8 @@
-//! UI (User Interface) test harnes for Cargo.
+//! UI (User Interface) test harness for Cargo.
 //!
 //! This file is a partial fork of what Clippy similarly uses.
 //!
-//! Copyright Rust Project and changes Copyright ODP.
-//! Licensed under MIT/Apache.
+//! Copyright Rust Project and changes Copyright ODP and licensed under MIT/Apache.
 //!
 //! See https://github.com/rust-lang/rust-clippy/blob/master/tests/compile-test.rs.
 

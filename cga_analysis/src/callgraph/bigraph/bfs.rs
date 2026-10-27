@@ -3,7 +3,7 @@
 //! Copied from the [pathfinding](https://crates.io/crates/pathfinding) crate and
 //! adapted for the BiCallgraph for less boilerplate & better performance.
 //!
-//! Pathfinding copyright Samuel Tardieu <sam@rfc1149.net> and released under Apache-2.0/MIT.
+//! Copyright Samuel Tardieu <sam@rfc1149.net> and changes Copyright ODP and licensed under Apache-2.0/MIT.
 
 use crate::callgraph::bigraph::{BiCallgraph, Edge, Node};
 

@@ -1,7 +1,6 @@
 //! A shallow fork of [`rustc_monomorphize`] with minor changes.
 //!
-//! Copyright Rust Project and changes Copyright ODP.
-//! Licensed under MIT/Apache.
+//! Copyright Rust Project and changes Copyright ODP and licensed under MIT/Apache.
 //!
 //! See https://github.com/rust-lang/rust/tree/main/compiler/rustc_monomorphize/src.
 //!
