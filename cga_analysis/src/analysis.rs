@@ -47,7 +47,7 @@ struct AnalysisNode<'a, 'tcx> {
 }
 
 /// Extract the Callgraph from what should be considered 'root' items in the current crate.
-/// 
+///
 /// These include:
 /// * entrypoints like fn main() when this crate is a binary
 /// * extern "C" fn's or those that are no_mangle
@@ -56,17 +56,15 @@ struct AnalysisNode<'a, 'tcx> {
 ///
 /// Can only be run once 'collect_and_partition_mono_items' pass has run.
 pub fn extract_from_roots<'tcx>(tcx: TyCtxt<'tcx>) -> Callgraph<'tcx> {
-    let roots = crate::monomorphize::collect_roots(
-            tcx,
-            crate::monomorphize::MonoItemCollectionStrategy::NoConstOrStatic,
-        );
+    let roots =
+        crate::monomorphize::collect_roots(tcx, crate::monomorphize::MonoItemCollectionStrategy::NoConstOrStatic);
     extract(tcx, roots)
 }
 
 /// Extract the Callgraph with a series of [MonoItem]s as root nodes.
-/// 
+///
 /// Walks over the MIR tree from these root nodes and collects any function calls and assertions.
-/// 
+///
 /// Can only be run once 'collect_and_partition_mono_items' pass has run.
 pub fn extract<'tcx>(tcx: TyCtxt<'tcx>, roots: Vec<MonoItem<'tcx>>) -> Callgraph<'tcx> {
     let mut state = AnalysisState {
@@ -101,28 +99,26 @@ impl<'a, 'tcx> mir::visit::Visitor<'tcx> for AnalysisNode<'a, 'tcx> {
     }
 
     fn visit_rvalue(&mut self, rvalue: &Rvalue<'tcx>, location: Location) {
-        let Some((_call_span, use_kind)) = self.find_dynamic_cast(rvalue) else {
-            return;
-        };
-
-        let use_ = Use::for_location(use_kind, self.body, self.body.source_info(location).clone());
-        self.on_edge(use_);
-        self.super_rvalue(rvalue, location);
+        // We are only interested in rvalue's when a fn is cast to a fnptr.
+        // Reasoning what happens to this ptr value is out of scope and hence we assume
+        // it will be used (derefenced & called) at some later point.
+        if let Rvalue::Cast(CastKind::PointerCoercion(PointerCoercion::ReifyFnPointer(_), _), operand, _) =
+            rvalue
+            && let span = operand.span(self.body)
+            && let Some(instance) = self.resolve_fn_operand_opt(operand, span)
+        {
+            let use_ = Use::for_location(
+                UseKind::FnPtrCast(instance),
+                self.body,
+                self.body.source_info(location).clone(),
+            );
+            self.on_edge(use_);
+            self.super_rvalue(rvalue, location);
+        }
     }
 }
 
 impl<'a, 'tcx> AnalysisNode<'a, 'tcx> {
-    fn find_dynamic_cast(&self, rval: &Rvalue<'tcx>) -> Option<(Span, UseKind<'tcx>)> {
-        match rval {
-            Rvalue::Cast(CastKind::PointerCoercion(PointerCoercion::ReifyFnPointer(_), _), operand, _fn_ptr_ty) => {
-                let span = operand.span(self.body);
-                self.resolve_fn_operand_opt(operand, span)
-                    .map(|instance| (span, UseKind::FnPtrCast(instance)))
-            }
-            _ => None,
-        }
-    }
-
     /// On MIR callgraph edge.
     ///
     /// An edge is a [`Use`] in the definition of a monomorphized [`Instance`].
@@ -304,11 +300,14 @@ impl<'tcx> AnalysisState<'tcx> {
 
         for method in dyn_object_call_to_impl_methods(virtual_def_id, instance.args, self.tcx) {
             // Add a 'fake' use to each of the VTable entries.
-            self.callgraph.register_edge(instance, Use {
-                kind: UseKind::VTableCalled(method),
-                hir_id: None,
-                span,
-            });
+            self.callgraph.register_edge(
+                instance,
+                Use {
+                    kind: UseKind::VTableCalled(method),
+                    hir_id: None,
+                    span,
+                },
+            );
             self.analyse_instance(method);
         }
     }

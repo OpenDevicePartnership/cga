@@ -29,9 +29,9 @@ mod dyn_object;
 mod errors;
 mod panics;
 
+pub mod analysis;
 pub mod diagnostics;
 pub mod monomorphize;
-pub mod analysis;
 
 use rustc_hir::{HirId, def_id::DefId};
 use rustc_lint_defs::declare_tool_lint;

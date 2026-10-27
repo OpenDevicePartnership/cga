@@ -83,8 +83,7 @@ impl Callbacks for Cga {
             store.register_lints(&[PANICS, BLACKLISTED]);
         }));
 
-        config.override_queries =
-            Some(|_session, queries| queries.queries.collect_and_partition_mono_items = cga_pass);
+        config.override_queries = Some(|_session, queries| queries.queries.collect_and_partition_mono_items = cga_pass);
     }
 
     fn after_analysis<'tcx>(
