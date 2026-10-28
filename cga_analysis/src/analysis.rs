@@ -92,7 +92,7 @@ impl<'a, 'tcx> mir::visit::Visitor<'tcx> for AnalysisNode<'a, 'tcx> {
 
         // Assert that can result in a panic.
         if let TerminatorKind::Assert { .. } = terminator.kind {
-            self.on_edge(Arrow::for_location(ArrowTarget::BuiltinMirAssert, self.body, source));
+            self.register_arrow(Arrow::for_location(ArrowTarget::BuiltinMirAssert, self.body, source));
         }
 
         // Call-like terminators.
@@ -110,7 +110,7 @@ impl<'a, 'tcx> mir::visit::Visitor<'tcx> for AnalysisNode<'a, 'tcx> {
             }
             _ => None,
         } {
-            self.on_edge(Arrow::for_location(ArrowTarget::Called(instance), self.body, source));
+            self.register_arrow(Arrow::for_location(ArrowTarget::Called(instance), self.body, source));
         }
 
         self.super_terminator(terminator, location);
@@ -129,26 +129,24 @@ impl<'a, 'tcx> mir::visit::Visitor<'tcx> for AnalysisNode<'a, 'tcx> {
                 self.body,
                 *self.body.source_info(location),
             );
-            self.on_edge(arrow);
+            self.register_arrow(arrow);
         }
         self.super_rvalue(rvalue, location);
     }
 }
 
 impl<'a, 'tcx> AnalysisNode<'a, 'tcx> {
-    /// On MIR callgraph edge.
+    /// On callgraph edge when we have an arrow from our [`Instance`] to something else.
     ///
-    /// An edge is a [`Arrow`] in the definition of a monomorphized [`Instance`].
+    /// Do not call this for root nodes, as we should not have an [`Instance`] yet.
     ///
     /// Will recurse the analysis if the [`Arrow`] is a call-like operation.
-    fn on_edge(&mut self, arrow: Arrow<'tcx>) {
+    fn register_arrow(&mut self, arrow: Arrow<'tcx>) {
         self.state.callgraph.register_edge(self.instance, arrow.clone());
 
         match arrow.target {
-            ArrowTarget::BuiltinMirAssert | ArrowTarget::AsyncPanic => {
-                // Non-recursive leaf node
-                return;
-            }
+            // Dead ends with no further arrows.
+            ArrowTarget::BuiltinMirAssert | ArrowTarget::AsyncPanic => return,
             // In any other case we should have fully monomorphized the function.
             ArrowTarget::Called(_) | ArrowTarget::VTableCalled(_) | ArrowTarget::FnPtrCast(_) => {
                 let callee_instance = arrow.opt_instance().unwrap_or_else(|| {
@@ -254,7 +252,7 @@ impl<'tcx> AnalysisState<'tcx> {
                         let data = &body[bb];
                         let source_info = data.terminator().source_info;
 
-                        this.on_edge(Arrow::for_location(ArrowTarget::AsyncPanic, body, source_info));
+                        this.register_arrow(Arrow::for_location(ArrowTarget::AsyncPanic, body, source_info));
                     }
                     POISONED => {} // Ignore
                     _ => {
