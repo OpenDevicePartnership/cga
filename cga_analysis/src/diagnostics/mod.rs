@@ -1,3 +1,5 @@
+mod rules;
+
 use cga_data::cmd::LintConfig;
 use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
@@ -7,8 +9,6 @@ use rustc_lint::Lint;
 use rustc_log::tracing::*;
 use rustc_middle::ty::TyCtxt;
 use rustc_span::{Span, SyntaxContext};
-
-mod rules;
 
 use crate::{
     Arrow, ArrowTarget, BLACKLISTED, Callgraph, PANICS,
@@ -190,7 +190,7 @@ fn process_boundaries<'tcx, Engine: LintEngine>(
             trace: &trace,
         };
 
-        lint_use::<Engine>(data, tcx);
+        data.lint::<Engine>(tcx);
     }
 }
 
@@ -258,112 +258,114 @@ fn decorate_cast(arrow: &Arrow<'_>, diag: &mut Diag<'_>) {
     }
 }
 
-fn lint_use<Engine: LintEngine>(data: LintData<'_, '_>, tcx: TyCtxt<'_>) {
-    let boundary_use = data.boundary;
-    let drop_glue_fn = tcx.require_lang_item(LangItem::DropGlue, boundary_use.span);
+impl LintData<'_, '_> {
+    fn lint<Engine: LintEngine>(&self, tcx: TyCtxt<'_>) {
+        let drop_glue_fn = tcx.require_lang_item(LangItem::DropGlue, self.boundary.span);
 
-    // Note(unwrap): hir_id is Some because TraceBoundary guarantees that it is local.
-    let lint_node = boundary_use
-        .hir_id
-        .expect("Local boundary should have an associated HirId");
+        // Note(unwrap): hir_id is Some because TraceBoundary guarantees that it is local.
+        let lint_node = self
+            .boundary
+            .hir_id
+            .expect("Local boundary should have an associated HirId");
 
-    info!("linting {boundary_use:?}");
+        let mut multi_span = MultiSpan::from_span(self.boundary.span);
 
-    let mut multi_span = MultiSpan::from_span(boundary_use.span);
+        decorate_expansion(&self.boundary, &mut multi_span);
 
-    decorate_expansion(&boundary_use, &mut multi_span);
-
-    tcx.emit_node_span_lint(
-        Engine::LINT,
-        lint_node,
-        multi_span,
-        rustc_errors::DiagDecorator(|diag| {
-            let issue = if Engine::is_direct(&data, tcx) {
-                Engine::DIRECT_ISSUE
-            } else {
-                Engine::INDIRECT_ISSUE
-            };
-
-            if let Some(callee) = boundary_use.opt_def_id() {
-                if callee == drop_glue_fn {
-                    // Note(unwrap): we are in drop glue, hence there must be an instance.
-                    let boundary_instance = boundary_use.opt_instance().unwrap();
-
-                    diag.primary_message(format!(
-                        "{} drop of `{}` which {}",
-                        boundary_use.noun(),
-                        boundary_instance.args.type_at(0),
-                        issue
-                    ));
+        tcx.emit_node_span_lint(
+            Engine::LINT,
+            lint_node,
+            multi_span,
+            rustc_errors::DiagDecorator(|diag| {
+                let issue = if Engine::is_direct(self, tcx) {
+                    Engine::DIRECT_ISSUE
                 } else {
-                    diag.primary_message(format!(
-                        "{} {} `{}` which {}",
-                        boundary_use.noun(),
-                        tcx.def_descr(callee),
-                        tcx.def_path_str(callee),
-                        issue
+                    Engine::INDIRECT_ISSUE
+                };
+
+                if let Some(callee) = self.boundary.opt_def_id() {
+                    if callee == drop_glue_fn {
+                        // Note(unwrap): we are in drop glue, hence there must be an instance.
+                        let boundary_instance = self.boundary.opt_instance().unwrap();
+
+                        diag.primary_message(format!(
+                            "{} drop of `{}` which {}",
+                            self.boundary.noun(),
+                            boundary_instance.args.type_at(0),
+                            issue
+                        ));
+                    } else {
+                        diag.primary_message(format!(
+                            "{} {} `{}` which {}",
+                            self.boundary.noun(),
+                            tcx.def_descr(callee),
+                            tcx.def_path_str(callee),
+                            issue
+                        ));
+                    }
+                } else {
+                    diag.primary_message(format!("{} which {}", self.boundary.noun(), issue));
+                }
+
+                if self.above_paths > 1 {
+                    diag.note(format!(
+                        "this location is called in {} different traces",
+                        self.above_paths
                     ));
                 }
-            } else {
-                diag.primary_message(format!("{} which {}", boundary_use.noun(), issue));
-            }
 
-            if data.above_paths > 1 {
-                diag.note(format!(
-                    "this location is called in {} different traces",
-                    data.above_paths
-                ));
-            }
-
-            if data.below_leafs > 1 {
-                diag.note(format!(
-                    "{} different {} from this location",
-                    data.below_leafs,
-                    Engine::PLURAL_NOUN,
-                ));
-            }
-
-            if let Some(leaf) = data.trace.last() {
-                decorate_leaf(&leaf, diag);
-            }
-
-            decorate_cast(&boundary_use, diag);
-
-            {
-                let backtrace = data
-                    .trace
-                    .iter()
-                    .rev()
-                    .enumerate()
-                    .map(|(i, arrow)| {
-                        let arrow_str = match arrow.target {
-                            ArrowTarget::Entrypoint(instance)
-                            | ArrowTarget::Called(instance)
-                            | ArrowTarget::VTableCalled(instance)
-                            | ArrowTarget::FnPtrCast(instance) => {
-                                let instance_path = if instance.def_id() == drop_glue_fn {
-                                    format!("drop of `{}`", instance.args.type_at(0))
-                                } else {
-                                    canonical_path(&instance)
-                                };
-
-                                format!("{instance_path} ({})", arrow.descriptor())
-                            }
-                            ArrowTarget::BuiltinMirAssert | ArrowTarget::AsyncPanic => arrow.descriptor().to_string(),
-                        };
-                        let is_boundary = arrow == &boundary_use;
-
-                        format!("{i}: {arrow_str}{}", if is_boundary { " <--" } else { "" })
-                    })
-                    .join("\n");
-
-                let number_of_paths = data.above_paths * data.below_paths;
-                if number_of_paths == 1 {
-                    diag.note(format!("backtrace:\n{backtrace}"));
-                } else {
-                    diag.note(format!("backtrace (1 of {number_of_paths}):\n{backtrace}"));
+                if self.below_leafs > 1 {
+                    diag.note(format!(
+                        "{} different {} from this location",
+                        self.below_leafs,
+                        Engine::PLURAL_NOUN,
+                    ));
                 }
-            }
-        }),
-    );
+
+                if let Some(leaf) = self.trace.last() {
+                    decorate_leaf(leaf, diag);
+                }
+
+                decorate_cast(&self.boundary, diag);
+
+                {
+                    let backtrace = self
+                        .trace
+                        .iter()
+                        .rev()
+                        .enumerate()
+                        .map(|(i, arrow)| {
+                            let arrow_str = match arrow.target {
+                                ArrowTarget::Entrypoint(instance)
+                                | ArrowTarget::Called(instance)
+                                | ArrowTarget::VTableCalled(instance)
+                                | ArrowTarget::FnPtrCast(instance) => {
+                                    let instance_path = if instance.def_id() == drop_glue_fn {
+                                        format!("drop of `{}`", instance.args.type_at(0))
+                                    } else {
+                                        canonical_path(&instance)
+                                    };
+
+                                    format!("{instance_path} ({})", arrow.descriptor())
+                                }
+                                ArrowTarget::BuiltinMirAssert | ArrowTarget::AsyncPanic => {
+                                    arrow.descriptor().to_string()
+                                }
+                            };
+                            let is_boundary = arrow == &self.boundary;
+
+                            format!("{i}: {arrow_str}{}", if is_boundary { " <--" } else { "" })
+                        })
+                        .join("\n");
+
+                    let number_of_paths = self.above_paths * self.below_paths;
+                    if number_of_paths == 1 {
+                        diag.note(format!("backtrace:\n{backtrace}"));
+                    } else {
+                        diag.note(format!("backtrace (1 of {number_of_paths}):\n{backtrace}"));
+                    }
+                }
+            }),
+        );
+    }
 }
