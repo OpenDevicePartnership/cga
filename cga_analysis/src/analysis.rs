@@ -142,11 +142,11 @@ impl<'a, 'tcx> AnalysisNode<'a, 'tcx> {
     ///
     /// Will recurse the analysis if the [`Arrow`] is a call-like operation.
     fn register_arrow(&mut self, arrow: Arrow<'tcx>) {
-        self.state.callgraph.register_edge(self.instance, arrow.clone());
+        self.state.callgraph.register_edge(self.instance, arrow);
 
         match arrow.target {
             // Dead ends with no further arrows.
-            ArrowTarget::BuiltinMirAssert | ArrowTarget::AsyncPanic => return,
+            ArrowTarget::BuiltinMirAssert | ArrowTarget::AsyncPanic => (),
             // In any other case we should have fully monomorphized the function.
             ArrowTarget::Called(_) | ArrowTarget::VTableCalled(_) | ArrowTarget::FnPtrCast(_) => {
                 let callee_instance = arrow.opt_instance().unwrap_or_else(|| {

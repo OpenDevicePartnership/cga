@@ -13,7 +13,7 @@ pub struct LintRuleSet {
 }
 
 impl LintRuleSet {
-    pub fn new<'a>(rules: &Vec<LintRule>) -> Result<Self, lazy_regex::regex::Error> {
+    pub fn new(rules: &[LintRule]) -> Result<Self, lazy_regex::regex::Error> {
         let mut path_regexes = vec![];
         let mut canonical_regexes = vec![];
         let mut crates = FxHashSet::default();

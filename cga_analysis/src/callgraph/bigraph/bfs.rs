@@ -68,7 +68,7 @@ impl<'tcx> BiCallgraph<'tcx> {
             // Build the path.
             let mut path: Vec<Edge<'tcx>> = vec![];
             // From middle to the start.
-            let mut node = Some(middle.clone());
+            let mut node = Some(middle);
             while let Some(n) = node {
                 node = predecessors[&n].map(|i| {
                     let prev = *predecessors.get_index(i).unwrap().0;
@@ -80,7 +80,7 @@ impl<'tcx> BiCallgraph<'tcx> {
             path.reverse();
             // And from middle to the end.
             let mut node = successors[&middle].map(|i| {
-                let next = successors.get_index(i).unwrap().0.clone();
+                let next = *successors.get_index(i).unwrap().0;
                 path.push(*self.successors(middle).find(|e| e.to == next).unwrap());
                 next
             });

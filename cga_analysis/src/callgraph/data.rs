@@ -37,13 +37,12 @@ impl<'tcx> Assembler<'tcx> {
         let (file, sl, sc, el, ec) = self.tcx.sess.source_map().span_to_location_info(span);
 
         let path = file
-            .map(|file| {
+            .and_then(|file| {
                 file.name
                     .clone()
                     .into_local_path()
                     .map(|path| path.to_string_lossy().to_string())
             })
-            .flatten()
             .unwrap_or_else(|| "{unknown}".to_string());
 
         let span = data::Span(
@@ -107,12 +106,12 @@ impl<'tcx> Callgraph<'tcx> {
         edges.reserve_exact(self.roots.len() + self.edges.len());
 
         for root in self.roots.iter() {
-            edges.push((None, root.clone()));
+            edges.push((None, *root));
         }
 
         for (from, tos) in self.edges.iter() {
             for to in tos.iter() {
-                edges.push((Some(*from), to.clone()));
+                edges.push((Some(*from), *to));
             }
         }
 

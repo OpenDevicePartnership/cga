@@ -1,7 +1,7 @@
 use std::rc::Rc;
 
 use indexmap::{IndexMap, IndexSet};
-use rustc_middle::ty::{Instance, TyCtxt};
+use rustc_middle::ty::Instance;
 
 use crate::{Arrow, callgraph::Callgraph};
 
@@ -50,12 +50,12 @@ impl<'tcx> From<&Callgraph<'tcx>> for BiCallgraph<'tcx> {
             let from = Node::Item(*from);
             let from_edges = edges.entry(from).or_default();
 
-            for use_ in tos.iter() {
-                let to = Node::from(use_);
+            for arrow in tos.iter() {
+                let to = Node::from(arrow);
                 let edge = Edge {
                     from,
                     to,
-                    arrow: use_.clone(),
+                    arrow: *arrow,
                 };
 
                 from_edges.insert(edge);
@@ -65,12 +65,12 @@ impl<'tcx> From<&Callgraph<'tcx>> for BiCallgraph<'tcx> {
 
         let entrypoint = Node::Entrypoint;
         let entrypoints = edges.entry(entrypoint).or_default();
-        for use_ in value.roots.iter() {
-            let to = Node::from(use_);
+        for arrow in value.roots.iter() {
+            let to = Node::from(arrow);
             let edge = Edge {
                 from: entrypoint,
                 to,
-                arrow: use_.clone(),
+                arrow: *arrow,
             };
             entrypoints.insert(edge);
             rev_edges.entry(to).or_default().insert(edge);
@@ -86,11 +86,10 @@ impl<'tcx> BiCallgraph<'tcx> {
     }
 
     /// Find all the crate boundaries from a leaf node.
-    pub fn find_boundaries<'a>(&'a self, leaf: &'a Arrow<'tcx>, tcx: TyCtxt<'tcx>, mut f: impl FnMut(&'a Arrow<'tcx>)) {
+    pub fn find_boundaries<'a>(&'a self, leaf: &'a Arrow<'tcx>, mut f: impl FnMut(&'a Arrow<'tcx>)) {
         fn visit_node<'a, 'tcx>(
             this: &'a BiCallgraph<'tcx>,
             to: Node<'tcx>,
-            tcx: TyCtxt<'tcx>,
             visited: &mut IndexSet<Node<'tcx>>,
             f: &mut impl FnMut(&'a Arrow<'tcx>),
         ) {
@@ -105,7 +104,7 @@ impl<'tcx> BiCallgraph<'tcx> {
                         continue;
                     }
 
-                    visit_node(this, edge.from, tcx, visited, f);
+                    visit_node(this, edge.from, visited, f);
                 }
             }
         }
@@ -124,7 +123,7 @@ impl<'tcx> BiCallgraph<'tcx> {
                     continue;
                 }
 
-                visit_node(self, edge.from, tcx, &mut visited, &mut f);
+                visit_node(self, edge.from, &mut visited, &mut f);
             }
         }
     }
@@ -268,7 +267,7 @@ impl<'tcx> Iterator for TraceIterator<'tcx> {
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(inner) = self.inner.take() {
             self.inner = inner.parent.clone();
-            Some(inner.current.clone())
+            Some(inner.current)
         } else {
             None
         }

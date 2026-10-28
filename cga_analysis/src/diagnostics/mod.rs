@@ -45,7 +45,7 @@ pub fn emit_lints<'tcx>(mut callgraph: Callgraph<'tcx>, config: &LintConfig, tcx
     for Edge { arrow: leaf, .. } in bigraph.edges() {
         if leaf.panic_status(tcx).any() {
             info!("Leaf {leaf:?}");
-            bigraph.find_boundaries(leaf, tcx, |boundary| {
+            bigraph.find_boundaries(leaf, |boundary| {
                 let root_span = rustc_span::hygiene::walk_chain(boundary.span, SyntaxContext::root());
                 panic_boundaries
                     .entry(root_span)
@@ -55,7 +55,7 @@ pub fn emit_lints<'tcx>(mut callgraph: Callgraph<'tcx>, config: &LintConfig, tcx
         }
 
         if blacklist.arrow_applies(leaf, tcx) {
-            bigraph.find_boundaries(leaf, tcx, |boundary| {
+            bigraph.find_boundaries(leaf, |boundary| {
                 let root_span = rustc_span::hygiene::walk_chain(boundary.span, SyntaxContext::root());
                 blacklist_boundaries
                     .entry(root_span)
