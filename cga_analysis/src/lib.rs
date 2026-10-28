@@ -24,12 +24,12 @@ extern crate rustc_span;
 extern crate rustc_trait_selection;
 extern crate rustc_type_ir;
 
-mod callgraph;
 mod dyn_object;
 mod errors;
 mod panics;
 
 pub mod analysis;
+pub mod callgraph;
 pub mod diagnostics;
 pub mod monomorphize;
 
@@ -83,7 +83,7 @@ pub struct Arrow<'tcx> {
 
 /// Pointy end of an [Arrow], denoting what is reachable.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-enum ArrowTarget<'tcx> {
+pub enum ArrowTarget<'tcx> {
     /// The instance is an entrypoint for the application.
     ///
     /// And entrypoint could be an extern "c" function, an ISR, main, etc.
@@ -100,7 +100,7 @@ enum ArrowTarget<'tcx> {
 
     /// A builtin assertion in MIR which can panic.
     ///
-    /// For example OverflowAdd will generate a terminator with [TerminatorKind::Assert].
+    /// For example OverflowAdd will generate a terminator with [rustc_middle::mir::TerminatorKind::Assert].
     BuiltinMirAssert,
 
     /// The implicit panic(s) associated with any async coroutine.

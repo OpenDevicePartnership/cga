@@ -2,7 +2,7 @@
 //!
 //! Copyright Rust Project and changes Copyright ODP and licensed under MIT/Apache.
 //!
-//! See https://github.com/rust-lang/rust/tree/main/compiler/rustc_monomorphize/src.
+//! See [rustc_monomorphize](https://github.com/rust-lang/rust/tree/main/compiler/rustc_monomorphize/src).
 //!
 //! We need to use [`collect_roots`] for our analysis pass, but this function is not exposed by [`rustc_monomorphize`].
 //! Instead we have forked the crate to regain the same functionality.

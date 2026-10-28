@@ -11,8 +11,6 @@ mod data;
 pub mod bigraph;
 
 /// The callgraph as used in the analysis step.
-///
-/// Each [`Arrow`] is annotated with the [`NodeId`] to give a deterministic ordering to the callgraph.
 #[derive(Clone, Debug)]
 pub struct Callgraph<'tcx> {
     roots: IndexSet<Arrow<'tcx>>,
