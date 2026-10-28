@@ -186,7 +186,7 @@ impl<'v> RootCollector<'_, 'v> {
                     self.output.push(dummy_spanned(MonoItem::Static(def_id)));
                 }
             },
-            DefKind::Const { .. } => {
+            DefKind::Const => {
                 // Const items only generate mono items if they are actually used somewhere.
                 // Just declaring them is insufficient.
 
@@ -230,49 +230,43 @@ impl<'v> RootCollector<'_, 'v> {
     }
 
     fn process_nested_body(&mut self, def_id: LocalDefId) {
-        match self.tcx.def_kind(def_id) {
-            DefKind::Closure => {
-                // for 'pub async fn foo(..)' also trying to monomorphize foo::{closure}
-                let is_pub_fn_coroutine = match *self.tcx.type_of(def_id).instantiate_identity().skip_norm_wip().kind()
-                {
-                    ty::Coroutine(cor_id, _args) => {
-                        let tcx = self.tcx;
-                        let parent_id = tcx.parent(cor_id);
-                        tcx.def_kind(parent_id) == DefKind::Fn
-                            && tcx.asyncness(parent_id).is_async()
-                            && tcx.visibility(parent_id).is_public()
+        if let DefKind::Closure = self.tcx.def_kind(def_id) {
+            // for 'pub async fn foo(..)' also trying to monomorphize foo::{closure}
+            let is_pub_fn_coroutine = match *self.tcx.type_of(def_id).instantiate_identity().skip_norm_wip().kind() {
+                ty::Coroutine(cor_id, _args) => {
+                    let tcx = self.tcx;
+                    let parent_id = tcx.parent(cor_id);
+                    tcx.def_kind(parent_id) == DefKind::Fn
+                        && tcx.asyncness(parent_id).is_async()
+                        && tcx.visibility(parent_id).is_public()
+                }
+                ty::Closure(..) | ty::CoroutineClosure(..) => false,
+                _ => unreachable!(),
+            };
+            if (self.strategy == MonoItemCollectionStrategy::Eager || is_pub_fn_coroutine)
+                && !self
+                    .tcx
+                    .generics_of(self.tcx.typeck_root_def_id_local(def_id))
+                    .requires_monomorphization(self.tcx)
+            {
+                let instance = match *self.tcx.type_of(def_id).instantiate_identity().skip_norm_wip().kind() {
+                    ty::Closure(def_id, args) | ty::Coroutine(def_id, args) | ty::CoroutineClosure(def_id, args) => {
+                        Instance::new_raw(def_id, self.tcx.erase_and_anonymize_regions(args))
                     }
-                    ty::Closure(..) | ty::CoroutineClosure(..) => false,
                     _ => unreachable!(),
                 };
-                if (self.strategy == MonoItemCollectionStrategy::Eager || is_pub_fn_coroutine)
-                    && !self
-                        .tcx
-                        .generics_of(self.tcx.typeck_root_def_id_local(def_id))
-                        .requires_monomorphization(self.tcx)
-                {
-                    let instance = match *self.tcx.type_of(def_id).instantiate_identity().skip_norm_wip().kind() {
-                        ty::Closure(def_id, args)
-                        | ty::Coroutine(def_id, args)
-                        | ty::CoroutineClosure(def_id, args) => {
-                            Instance::new_raw(def_id, self.tcx.erase_and_anonymize_regions(args))
-                        }
-                        _ => unreachable!(),
-                    };
-                    let Ok(instance) = self.tcx.try_normalize_erasing_regions(
-                        ty::TypingEnv::fully_monomorphized(),
-                        Unnormalized::new_wip(instance),
-                    ) else {
-                        // Don't ICE on an impossible-to-normalize closure.
-                        return;
-                    };
-                    let mono_item = create_fn_mono_item(self.tcx, instance, DUMMY_SP);
-                    if mono_item.node.is_instantiable(self.tcx) {
-                        self.output.push(mono_item);
-                    }
+                let Ok(instance) = self.tcx.try_normalize_erasing_regions(
+                    ty::TypingEnv::fully_monomorphized(),
+                    Unnormalized::new_wip(instance),
+                ) else {
+                    // Don't ICE on an impossible-to-normalize closure.
+                    return;
+                };
+                let mono_item = create_fn_mono_item(self.tcx, instance, DUMMY_SP);
+                if mono_item.node.is_instantiable(self.tcx) {
+                    self.output.push(mono_item);
                 }
             }
-            _ => {}
         }
     }
 
@@ -310,9 +304,11 @@ impl<'v> RootCollector<'_, 'v> {
             return false;
         }
 
-        let has_export_link_name = HasAttrs::get_attrs(def_id, &self.tcx).iter().any(|attr| match attr {
-            rustc_attr_ir::Attribute::Parsed(rustc_attr_ir::AttributeKind::ExportName { .. }) => true,
-            _ => false,
+        let has_export_link_name = HasAttrs::get_attrs(def_id, &self.tcx).iter().any(|attr| {
+            matches!(
+                attr,
+                rustc_attr_ir::Attribute::Parsed(rustc_attr_ir::AttributeKind::ExportName { .. })
+            )
         });
         let no_mangle = attrs.flags.contains(CodegenFnAttrFlags::NO_MANGLE);
 
@@ -321,7 +317,6 @@ impl<'v> RootCollector<'_, 'v> {
 
     /// If `def_id` represents a root, pushes it onto the list of
     /// outputs. (Note that all roots must be monomorphic.)
-
     fn push_if_root(&mut self, def_id: LocalDefId) {
         if self.is_root(def_id) {
             let instance = Instance::mono(self.tcx, def_id.to_def_id());
