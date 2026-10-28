@@ -10,7 +10,7 @@ use rustc_span::{Span, span_bug};
 use rustc_type_ir::CoroutineArgs;
 
 use crate::dyn_object::dyn_object_call_to_impl_methods;
-use crate::{Callgraph, Use, UseKind};
+use crate::{Arrow, ArrowTarget, Callgraph};
 
 /// Context used for the entire analysis.
 struct AnalysisState<'tcx> {
@@ -27,7 +27,7 @@ struct AnalysisState<'tcx> {
 /// Roots and edges (and implicitly nodes) in the callgraph
 /// are being registered during this analysis.
 ///
-/// Edges are captured as [Use], and can be
+/// Edges are captured as [Arrow], and can be
 /// * entrypoints
 /// * explicit functions calls
 /// * implicit possible function calls
@@ -92,7 +92,7 @@ impl<'a, 'tcx> mir::visit::Visitor<'tcx> for AnalysisNode<'a, 'tcx> {
 
         // Assert that can result in a panic.
         if let TerminatorKind::Assert { .. } = terminator.kind {
-            self.on_edge(Use::for_location(UseKind::BuiltinMirAssert, self.body, source));
+            self.on_edge(Arrow::for_location(ArrowTarget::BuiltinMirAssert, self.body, source));
         }
 
         // Call-like terminators.
@@ -110,7 +110,7 @@ impl<'a, 'tcx> mir::visit::Visitor<'tcx> for AnalysisNode<'a, 'tcx> {
             }
             _ => None,
         } {
-            self.on_edge(Use::for_location(UseKind::Called(instance), self.body, source));
+            self.on_edge(Arrow::for_location(ArrowTarget::Called(instance), self.body, source));
         }
 
         self.super_terminator(terminator, location);
@@ -124,12 +124,12 @@ impl<'a, 'tcx> mir::visit::Visitor<'tcx> for AnalysisNode<'a, 'tcx> {
             && let span = operand.span(self.body)
             && let Some(instance) = self.resolve_fn_operand_opt(operand, span)
         {
-            let use_ = Use::for_location(
-                UseKind::FnPtrCast(instance),
+            let arrow = Arrow::for_location(
+                ArrowTarget::FnPtrCast(instance),
                 self.body,
                 *self.body.source_info(location),
             );
-            self.on_edge(use_);
+            self.on_edge(arrow);
         }
         self.super_rvalue(rvalue, location);
     }
@@ -138,35 +138,35 @@ impl<'a, 'tcx> mir::visit::Visitor<'tcx> for AnalysisNode<'a, 'tcx> {
 impl<'a, 'tcx> AnalysisNode<'a, 'tcx> {
     /// On MIR callgraph edge.
     ///
-    /// An edge is a [`Use`] in the definition of a monomorphized [`Instance`].
+    /// An edge is a [`Arrow`] in the definition of a monomorphized [`Instance`].
     ///
-    /// Will recurse the analysis if the [`Use`] is a call-like operation.
-    fn on_edge(&mut self, use_: Use<'tcx>) {
-        self.state.callgraph.register_edge(self.instance, use_.clone());
+    /// Will recurse the analysis if the [`Arrow`] is a call-like operation.
+    fn on_edge(&mut self, arrow: Arrow<'tcx>) {
+        self.state.callgraph.register_edge(self.instance, arrow.clone());
 
-        match use_.kind {
-            UseKind::BuiltinMirAssert | UseKind::AsyncPanic => {
+        match arrow.target {
+            ArrowTarget::BuiltinMirAssert | ArrowTarget::AsyncPanic => {
                 // Non-recursive leaf node
                 return;
             }
             // In any other case we should have fully monomorphized the function.
-            UseKind::Called(_) | UseKind::VTableCalled(_) | UseKind::FnPtrCast(_) => {
-                let callee_instance = use_.opt_instance().unwrap_or_else(|| {
+            ArrowTarget::Called(_) | ArrowTarget::VTableCalled(_) | ArrowTarget::FnPtrCast(_) => {
+                let callee_instance = arrow.opt_instance().unwrap_or_else(|| {
                     span_bug!(
-                        use_.span,
-                        "called expect_instance on a use_ that does not have an instance"
+                        arrow.span,
+                        "called expect_instance on an arrow that does not have an instance"
                     )
                 });
 
                 if let InstanceKind::Virtual(..) = callee_instance.def {
-                    self.state.analyse_virtual(*callee_instance, use_.span);
+                    self.state.analyse_virtual(*callee_instance, arrow.span);
                 } else {
                     self.state.analyse_instance(*callee_instance);
                 }
             }
-            UseKind::Entrypoint(..) => {
+            ArrowTarget::Entrypoint(..) => {
                 span_bug!(
-                    use_.span,
+                    arrow.span,
                     "Entrypoint is a root node of the graph, and cannot be logically generated mid-analysis"
                 );
             }
@@ -234,7 +234,7 @@ impl<'tcx> AnalysisState<'tcx> {
             debug!("visiting (async coroutine) {instance:#?} {body:#?}");
 
             // Visit all BB's associated with Unresumed discriminators.
-            // Do not visit "Returned" and "Panicked" discriminator bb's, instead emit a UseKind::AsyncPanic
+            // Do not visit "Returned" and "Panicked" discriminator bb's, instead emit a ArrowKind::AsyncPanic
             // BB0 is the switch statement
 
             let switch_bb = &body[body.basic_blocks.start_node()];
@@ -254,7 +254,7 @@ impl<'tcx> AnalysisState<'tcx> {
                         let data = &body[bb];
                         let source_info = data.terminator().source_info;
 
-                        this.on_edge(Use::for_location(UseKind::AsyncPanic, body, source_info));
+                        this.on_edge(Arrow::for_location(ArrowTarget::AsyncPanic, body, source_info));
                     }
                     POISONED => {} // Ignore
                     _ => {
@@ -290,8 +290,8 @@ impl<'tcx> AnalysisState<'tcx> {
             // Add a 'fake' use to each of the VTable entries.
             self.callgraph.register_edge(
                 instance,
-                Use {
-                    kind: UseKind::VTableCalled(method),
+                Arrow {
+                    target: ArrowTarget::VTableCalled(method),
                     hir_id: None,
                     span,
                 },

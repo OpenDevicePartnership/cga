@@ -11,7 +11,7 @@ use rustc_span::{Span, SyntaxContext};
 mod rules;
 
 use crate::{
-    BLACKLISTED, Callgraph, PANICS, Use, UseKind,
+    Arrow, ArrowTarget, BLACKLISTED, Callgraph, PANICS,
     callgraph::bigraph::{BiCallgraph, Edge, Node},
     canonical_path,
     diagnostics::rules::LintRuleSet,
@@ -20,8 +20,8 @@ use crate::{
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 struct BoundaryLeaf<'a, 'tcx> {
-    boundary: &'a Use<'tcx>,
-    leaf: &'a Use<'tcx>,
+    boundary: &'a Arrow<'tcx>,
+    leaf: &'a Arrow<'tcx>,
 }
 
 pub fn emit_lints<'tcx>(mut callgraph: Callgraph<'tcx>, config: &LintConfig, tcx: TyCtxt<'tcx>) {
@@ -30,10 +30,10 @@ pub fn emit_lints<'tcx>(mut callgraph: Callgraph<'tcx>, config: &LintConfig, tcx
     let blacklist = LintRuleSet::new(&config.blacklist).unwrap();
 
     // Cut away all edges in the callgraph that are whitelisted.
-    callgraph.cut_edges(|use_| {
-        (config.options.allow_async_panic && matches!(use_.kind, UseKind::AsyncPanic))
-            || (config.options.allow_assert && matches!(use_.kind, UseKind::BuiltinMirAssert))
-            || whitelist.use_applies(use_, tcx)
+    callgraph.cut_edges(|arrow| {
+        (config.options.allow_async_panic && matches!(arrow.target, ArrowTarget::AsyncPanic))
+            || (config.options.allow_assert && matches!(arrow.target, ArrowTarget::BuiltinMirAssert))
+            || whitelist.arrow_applies(arrow, tcx)
     });
 
     let bigraph = BiCallgraph::from(&callgraph);
@@ -42,7 +42,7 @@ pub fn emit_lints<'tcx>(mut callgraph: Callgraph<'tcx>, config: &LintConfig, tcx
     let mut panic_boundaries: IndexMap<Span, IndexSet<BoundaryLeaf<'_, 'tcx>>> = IndexMap::default();
     let mut blacklist_boundaries: IndexMap<Span, IndexSet<BoundaryLeaf<'_, 'tcx>>> = IndexMap::default();
 
-    for Edge { use_: leaf, .. } in bigraph.edges() {
+    for Edge { arrow: leaf, .. } in bigraph.edges() {
         if leaf.panic_status(tcx).any() {
             info!("Leaf {leaf:?}");
             bigraph.find_boundaries(leaf, tcx, |boundary| {
@@ -54,7 +54,7 @@ pub fn emit_lints<'tcx>(mut callgraph: Callgraph<'tcx>, config: &LintConfig, tcx
             });
         }
 
-        if blacklist.use_applies(leaf, tcx) {
+        if blacklist.arrow_applies(leaf, tcx) {
             bigraph.find_boundaries(leaf, tcx, |boundary| {
                 let root_span = rustc_span::hygiene::walk_chain(boundary.span, SyntaxContext::root());
                 blacklist_boundaries
@@ -151,7 +151,7 @@ fn process_boundaries<'tcx, Engine: LintEngine>(
         };
 
         // Note(unwrap): `find_shortest_from_roots` generates traces with at least 1 edge.
-        let boundary = path_from_root.last().unwrap().use_;
+        let boundary = path_from_root.last().unwrap().arrow;
 
         // Note(unwrap): we got here, hence there should be a path.
         let path_to_panics = bigraph
@@ -180,7 +180,7 @@ fn process_boundaries<'tcx, Engine: LintEngine>(
             }
         }
 
-        let trace = trace.iter().map(|e| e.use_).collect();
+        let trace = trace.iter().map(|e| e.arrow).collect();
 
         let data = LintData {
             boundary,
@@ -196,7 +196,7 @@ fn process_boundaries<'tcx, Engine: LintEngine>(
 
 #[derive(Debug)]
 struct LintData<'a, 'tcx> {
-    boundary: Use<'tcx>,
+    boundary: Arrow<'tcx>,
 
     /// Number of call paths to end up at the boundary.
     above_paths: usize,
@@ -208,52 +208,52 @@ struct LintData<'a, 'tcx> {
     below_leafs: usize,
 
     /// The trace picked as the example to illustrate the panic path.
-    trace: &'a Vec<Use<'tcx>>,
+    trace: &'a Vec<Arrow<'tcx>>,
 }
 
-impl<'tcx> Use<'tcx> {
+impl<'tcx> Arrow<'tcx> {
     fn descriptor(&self) -> &'static str {
-        match self.kind {
-            UseKind::Entrypoint(..) => "entrypoint",
-            UseKind::Called(..) => "called",
-            UseKind::VTableCalled(..) => "possible vtable resolution",
-            UseKind::FnPtrCast(..) => "fn-ptr cast",
-            UseKind::BuiltinMirAssert => "assert",
-            UseKind::AsyncPanic => "implicit async panic",
+        match self.target {
+            ArrowTarget::Entrypoint(..) => "entrypoint",
+            ArrowTarget::Called(..) => "called",
+            ArrowTarget::VTableCalled(..) => "possible vtable resolution",
+            ArrowTarget::FnPtrCast(..) => "fn-ptr cast",
+            ArrowTarget::BuiltinMirAssert => "assert",
+            ArrowTarget::AsyncPanic => "implicit async panic",
         }
     }
 
     fn noun(&self) -> &'static str {
-        match self.kind {
-            UseKind::Entrypoint(..) => "start to",
-            UseKind::Called(..) => "call to",
-            UseKind::VTableCalled(..) => "possible dyn object call to",
-            UseKind::FnPtrCast(..) => "possible later call to",
-            UseKind::BuiltinMirAssert => "implicit assert",
-            UseKind::AsyncPanic => "can be poll'd after Ready",
+        match self.target {
+            ArrowTarget::Entrypoint(..) => "start to",
+            ArrowTarget::Called(..) => "call to",
+            ArrowTarget::VTableCalled(..) => "possible dyn object call to",
+            ArrowTarget::FnPtrCast(..) => "possible later call to",
+            ArrowTarget::BuiltinMirAssert => "implicit assert",
+            ArrowTarget::AsyncPanic => "can be poll'd after Ready",
         }
     }
 }
 
-fn decorate_expansion(use_: &Use<'_>, multi_span: &mut MultiSpan) {
-    if use_.span.from_expansion() {
-        let root_span = rustc_span::hygiene::walk_chain(use_.span, SyntaxContext::root());
-        if use_.span != root_span {
+fn decorate_expansion(arrow: &Arrow<'_>, multi_span: &mut MultiSpan) {
+    if arrow.span.from_expansion() {
+        let root_span = rustc_span::hygiene::walk_chain(arrow.span, SyntaxContext::root());
+        if arrow.span != root_span {
             multi_span.push_span_label(root_span, "expanded from here");
         }
     }
 }
 
 /// Decorate with extra notes if the leaf node is a panic associated with an async coroutine
-fn decorate_leaf(use_: &Use<'_>, diag: &mut Diag<'_>) {
-    if matches!(use_.kind, UseKind::AsyncPanic) {
+fn decorate_leaf(arrow: &Arrow<'_>, diag: &mut Diag<'_>) {
+    if matches!(arrow.target, ArrowTarget::AsyncPanic) {
         diag.note("an async block can always panic when poll'd after Ready");
     }
 }
 
 /// Decorate with extra notes if the boundary is not a straightforward function call
-fn decorate_cast(use_: &Use<'_>, diag: &mut Diag<'_>) {
-    if matches!(use_.kind, UseKind::FnPtrCast(..)) {
+fn decorate_cast(arrow: &Arrow<'_>, diag: &mut Diag<'_>) {
+    if matches!(arrow.target, ArrowTarget::FnPtrCast(..)) {
         diag.note("when casting to a function pointer, we will assume that it will be called at some point");
     }
 }
@@ -335,25 +335,25 @@ fn lint_use<Engine: LintEngine>(data: LintData<'_, '_>, tcx: TyCtxt<'_>) {
                     .iter()
                     .rev()
                     .enumerate()
-                    .map(|(i, use_)| {
-                        let use_str = match use_.kind {
-                            UseKind::Entrypoint(instance)
-                            | UseKind::Called(instance)
-                            | UseKind::VTableCalled(instance)
-                            | UseKind::FnPtrCast(instance) => {
+                    .map(|(i, arrow)| {
+                        let arrow_str = match arrow.target {
+                            ArrowTarget::Entrypoint(instance)
+                            | ArrowTarget::Called(instance)
+                            | ArrowTarget::VTableCalled(instance)
+                            | ArrowTarget::FnPtrCast(instance) => {
                                 let instance_path = if instance.def_id() == drop_glue_fn {
                                     format!("drop of `{}`", instance.args.type_at(0))
                                 } else {
                                     canonical_path(&instance)
                                 };
 
-                                format!("{instance_path} ({})", use_.descriptor())
+                                format!("{instance_path} ({})", arrow.descriptor())
                             }
-                            UseKind::BuiltinMirAssert | UseKind::AsyncPanic => use_.descriptor().to_string(),
+                            ArrowTarget::BuiltinMirAssert | ArrowTarget::AsyncPanic => arrow.descriptor().to_string(),
                         };
-                        let is_boundary = use_ == &boundary_use;
+                        let is_boundary = arrow == &boundary_use;
 
-                        format!("{i}: {use_str}{}", if is_boundary { " <--" } else { "" })
+                        format!("{i}: {arrow_str}{}", if is_boundary { " <--" } else { "" })
                     })
                     .join("\n");
 

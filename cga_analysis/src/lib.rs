@@ -59,28 +59,31 @@ declare_tool_lint! {
 
 use crate::callgraph::Callgraph;
 
-/// A Use of a function or a panic.
+/// The [Arrow] from a site in the MIR tree, to something denoted by [ArrowTarget].
+///
+/// The origin of the [Arrow] is loosely denoted by its span and possibly the local [HirId].
+/// Thus getting the origin of an [Arrow] is not possible without the context of an entire [Callgraph].
+///
+/// Note that for [ArrowTarget::Entrypoint] a pseudo-Arrow is created that points from itself to itself.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct Use<'tcx> {
-    /// The kind associated with the [`Use`].
+pub struct Arrow<'tcx> {
+    /// The kind associated with the [`Arrow`].
     ///
     /// When calling a function, refers to the monomorphized [`Instance`] of the function called.
-    kind: UseKind<'tcx>,
+    target: ArrowTarget<'tcx>,
 
-    /// The calling location of the [`Use`].
+    /// The origin location of the [`Arrow`].
     span: Span,
 
-    /// The HIR node associated with the calling location, necessary for emitting diagnostics.
+    /// The HIR node associated with the origin location, necessary for emitting diagnostics.
     ///
     /// Only applicable for nodes within our local crate.
     hir_id: Option<HirId>,
 }
 
-/// Nodes in a call graph.
-///
-/// Each node is a *possible* call to monomorphized functions (possibly), or panic.
+/// Pointy end of an [Arrow], denoting what is reachable.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-enum UseKind<'tcx> {
+enum ArrowTarget<'tcx> {
     /// The instance is an entrypoint for the application.
     ///
     /// And entrypoint could be an extern "c" function, an ISR, main, etc.
@@ -109,33 +112,33 @@ enum UseKind<'tcx> {
     AsyncPanic,
 }
 
-impl<'tcx> Use<'tcx> {
-    fn for_location(kind: UseKind<'tcx>, body: &Body<'tcx>, source: SourceInfo) -> Use<'tcx> {
-        Use {
-            kind,
+impl<'tcx> Arrow<'tcx> {
+    fn for_location(target: ArrowTarget<'tcx>, body: &Body<'tcx>, source: SourceInfo) -> Arrow<'tcx> {
+        Arrow {
+            target,
             span: source.span,
             hir_id: source.scope.lint_root(&body.source_scopes),
         }
     }
 
     pub fn opt_def_id(&self) -> Option<DefId> {
-        match self.kind {
-            UseKind::Called(instance)
-            | UseKind::VTableCalled(instance)
-            | UseKind::FnPtrCast(instance)
-            | UseKind::Entrypoint(instance) => Some(instance.def_id()),
-            UseKind::BuiltinMirAssert => None,
-            UseKind::AsyncPanic => None,
+        match self.target {
+            ArrowTarget::Called(instance)
+            | ArrowTarget::VTableCalled(instance)
+            | ArrowTarget::FnPtrCast(instance)
+            | ArrowTarget::Entrypoint(instance) => Some(instance.def_id()),
+            ArrowTarget::BuiltinMirAssert => None,
+            ArrowTarget::AsyncPanic => None,
         }
     }
 
     pub fn opt_instance(&self) -> Option<&Instance<'tcx>> {
-        match &self.kind {
-            UseKind::FnPtrCast(instance)
-            | UseKind::Called(instance)
-            | UseKind::VTableCalled(instance)
-            | UseKind::Entrypoint(instance) => Some(instance),
-            UseKind::BuiltinMirAssert | UseKind::AsyncPanic => None,
+        match &self.target {
+            ArrowTarget::FnPtrCast(instance)
+            | ArrowTarget::Called(instance)
+            | ArrowTarget::VTableCalled(instance)
+            | ArrowTarget::Entrypoint(instance) => Some(instance),
+            ArrowTarget::BuiltinMirAssert | ArrowTarget::AsyncPanic => None,
         }
     }
 }

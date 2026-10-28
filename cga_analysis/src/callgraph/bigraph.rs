@@ -3,7 +3,7 @@ use std::rc::Rc;
 use indexmap::{IndexMap, IndexSet};
 use rustc_middle::ty::{Instance, TyCtxt};
 
-use crate::{Use, callgraph::Callgraph};
+use crate::{Arrow, callgraph::Callgraph};
 
 mod bfs;
 
@@ -25,18 +25,18 @@ pub enum Node<'tcx> {
 pub struct Edge<'tcx> {
     pub from: Node<'tcx>,
     pub to: Node<'tcx>,
-    pub use_: Use<'tcx>,
+    pub arrow: Arrow<'tcx>,
 }
 
-impl<'tcx> From<&Use<'tcx>> for Node<'tcx> {
-    fn from(value: &Use<'tcx>) -> Self {
-        match value.kind {
-            crate::UseKind::Entrypoint(instance)
-            | crate::UseKind::Called(instance)
-            | crate::UseKind::VTableCalled(instance)
-            | crate::UseKind::FnPtrCast(instance) => Node::Item(instance),
-            crate::UseKind::BuiltinMirAssert => Node::Assert,
-            crate::UseKind::AsyncPanic => Node::AsyncPanic,
+impl<'tcx> From<&Arrow<'tcx>> for Node<'tcx> {
+    fn from(value: &Arrow<'tcx>) -> Self {
+        match value.target {
+            crate::ArrowTarget::Entrypoint(instance)
+            | crate::ArrowTarget::Called(instance)
+            | crate::ArrowTarget::VTableCalled(instance)
+            | crate::ArrowTarget::FnPtrCast(instance) => Node::Item(instance),
+            crate::ArrowTarget::BuiltinMirAssert => Node::Assert,
+            crate::ArrowTarget::AsyncPanic => Node::AsyncPanic,
         }
     }
 }
@@ -55,7 +55,7 @@ impl<'tcx> From<&Callgraph<'tcx>> for BiCallgraph<'tcx> {
                 let edge = Edge {
                     from,
                     to,
-                    use_: use_.clone(),
+                    arrow: use_.clone(),
                 };
 
                 from_edges.insert(edge);
@@ -70,7 +70,7 @@ impl<'tcx> From<&Callgraph<'tcx>> for BiCallgraph<'tcx> {
             let edge = Edge {
                 from: entrypoint,
                 to,
-                use_: use_.clone(),
+                arrow: use_.clone(),
             };
             entrypoints.insert(edge);
             rev_edges.entry(to).or_default().insert(edge);
@@ -86,13 +86,13 @@ impl<'tcx> BiCallgraph<'tcx> {
     }
 
     /// Find all the crate boundaries from a leaf node.
-    pub fn find_boundaries<'a>(&'a self, leaf: &'a Use<'tcx>, tcx: TyCtxt<'tcx>, mut f: impl FnMut(&'a Use<'tcx>)) {
+    pub fn find_boundaries<'a>(&'a self, leaf: &'a Arrow<'tcx>, tcx: TyCtxt<'tcx>, mut f: impl FnMut(&'a Arrow<'tcx>)) {
         fn visit_node<'a, 'tcx>(
             this: &'a BiCallgraph<'tcx>,
             to: Node<'tcx>,
             tcx: TyCtxt<'tcx>,
             visited: &mut IndexSet<Node<'tcx>>,
-            f: &mut impl FnMut(&'a Use<'tcx>),
+            f: &mut impl FnMut(&'a Arrow<'tcx>),
         ) {
             if !visited.insert(to) {
                 return;
@@ -100,8 +100,8 @@ impl<'tcx> BiCallgraph<'tcx> {
 
             if let Some(edges) = this.rev_edges.get(&to) {
                 for edge in edges {
-                    if edge.use_.hir_id.is_some() {
-                        f(&edge.use_);
+                    if edge.arrow.hir_id.is_some() {
+                        f(&edge.arrow);
                         continue;
                     }
 
@@ -120,7 +120,7 @@ impl<'tcx> BiCallgraph<'tcx> {
 
         if let Some(edges) = self.rev_edges.get(&callee) {
             for edge in edges {
-                if edge.use_ != *leaf {
+                if edge.arrow != *leaf {
                     continue;
                 }
 
@@ -129,9 +129,9 @@ impl<'tcx> BiCallgraph<'tcx> {
         }
     }
 
-    pub fn find_shortest_from_roots(&self, boundaries: &IndexSet<Use<'tcx>>) -> Option<Vec<Edge<'tcx>>> {
+    pub fn find_shortest_from_roots(&self, boundaries: &IndexSet<Arrow<'tcx>>) -> Option<Vec<Edge<'tcx>>> {
         for e in self.edges() {
-            if boundaries.contains(&e.use_)
+            if boundaries.contains(&e.arrow)
                 && let Some(mut trace) =
                     self.bfs_bidirectional(std::iter::once(Node::Entrypoint), std::iter::once(e.from))
             {
