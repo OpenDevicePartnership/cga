@@ -246,11 +246,8 @@ fn decorate_expansion(use_: &Use<'_>, multi_span: &mut MultiSpan) {
 
 /// Decorate with extra notes if the leaf node is a panic associated with an async coroutine
 fn decorate_leaf(use_: &Use<'_>, diag: &mut Diag<'_>) {
-    match use_.kind {
-        UseKind::AsyncPanic => {
-            diag.note("an async block can always panic when poll'd after Ready");
-        }
-        _ => {}
+    if matches!(use_.kind, UseKind::AsyncPanic) {
+        diag.note("an async block can always panic when poll'd after Ready");
     }
 }
 
