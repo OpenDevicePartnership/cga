@@ -257,8 +257,7 @@ fn decorate_leaf(use_: &Use<'_>, diag: &mut Diag<'_>) {
 /// Decorate with extra notes if the boundary is not a straightforward function call
 fn decorate_cast(use_: &Use<'_>, diag: &mut Diag<'_>) {
     if matches!(use_.kind, UseKind::FnPtrCast(..)) {
-        diag.note("once a function is cast to a function pointer, cga can no longer tell how it is used");
-        diag.note("as a precaution, it must assume you will eventually call the function");
+        diag.note("when casting to a function pointer, we will assume that it will be called at some point");
     }
 }
 
