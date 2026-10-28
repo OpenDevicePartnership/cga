@@ -65,3 +65,12 @@ jobs:
       - name: Machete
         run: cargo machete
 
+  reuse-lint:
+    runs-on: ubuntu-latest
+    name: reuse lint
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Reuse Lint
+        uses: fsfe/reuse-action@v6
