@@ -85,7 +85,10 @@ impl TestContext {
         defaults.diagnostic_code_prefix = Some(Spanned::dummy("cga::".into())).into();
         config.with_args(&self.args);
 
-        config.filter(&get_rustc_sysroot().to_string_lossy(), "rustc-sysroot");
+        let sysroot_filter = (Match::from(get_rustc_sysroot().as_path()), b"rustc-sysroot".to_vec());
+        let defaults = config.comment_defaults.base();
+        defaults.normalize_stderr.push(sysroot_filter.clone());
+        defaults.normalize_stdout.push(sysroot_filter);
         config.filter("cga-emit:.*\n", "");
 
         config.program.args.extend(
