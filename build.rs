@@ -1,4 +1,9 @@
 fn main() {
+    // Windows finds the rustc DLLs through PATH and does not support Unix rpaths.
+    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
+        return;
+    }
+
     let rustc = std::env::var("RUSTC").expect("RUSTC env var must be set for build script");
     let output = std::process::Command::new(rustc)
         .args(["--print", "sysroot"])
