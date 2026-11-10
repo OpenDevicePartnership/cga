@@ -6,5 +6,5 @@ fn main() {
         .expect("failed to run rustc --print sysroot");
     let stdout = String::from_utf8(output.stdout).expect("rustc --print sysroot output was not UTF-8");
     let sysroot = stdout.trim_end();
-    println!("cargo:rustc-link-arg=-Wl,-rpath={sysroot}/lib")
+    println!("cargo:rustc-link-arg=-Wl,-rpath,{sysroot}/lib")
 }
