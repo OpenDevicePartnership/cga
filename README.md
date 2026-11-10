@@ -156,6 +156,12 @@ TESTNAME=simple cargo uibless
 
 Diagnostic information can be gathered by setting env `RUSTC_LOG=cga_analysis=info`.
 
+Tests that inspect the standard library's process implementation use
+`host_linux`, `host_windows`, and `host_macos` revisions, with separate
+`.stderr` snapshots for each platform. Run `cargo uibless` on the relevant platform to update
+its snapshots, and review the diagnostic changes before committing them.
+The other platforms' snapshots should remain unchanged.
+
 ## Notes
 
 ### Optimization levels

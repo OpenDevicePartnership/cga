@@ -159,6 +159,7 @@ fn run_ui(cx: &TestContext) {
 
 fn run_ui_cargo(cx: &TestContext) {
     let mut config = cx.base_config("ui-cargo", false);
+    config.comment_start = "#";
     config.program.input_file_flag = CommandBuilder::cargo().input_file_flag;
     config.program.out_dir_flag = CommandBuilder::cargo().out_dir_flag;
     config.program.args = vec![
