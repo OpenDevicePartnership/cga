@@ -207,8 +207,12 @@ impl<'tcx> AnalysisState<'tcx> {
 
         let owner = instance.def_id();
 
-        if self.tcx.intrinsic(owner).is_some() {
-            // When it is an intrinsic, build new raw instance for it.
+        if let Some(intrinsic) = self.tcx.intrinsic(owner) {
+            // If the intrinsic will be overwritten in codegen, we should not explore the shim MIR further.
+            if intrinsic.must_be_overridden || self.tcx.sess.replaced_intrinsics.contains(&intrinsic.name) {
+                return;
+            }
+            // Switch the Instance from InstanceKind::Intrinsic to InstanceKind::Item.
             instance = ty::Instance::new_raw(owner, instance.args);
         }
 
