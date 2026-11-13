@@ -12,13 +12,19 @@ path = [
     "tests/compile-test.rs"
 ]
 precedence = "override"
-SPDX-FileCopyrightText = "The Rust Project Developers (see https://thanks.rust-lang.org)"
+SPDX-FileCopyrightText = [
+    "The Rust Project Developers (see https://thanks.rust-lang.org)",
+    "OpenDevicePartnership/odp-platform-maintainers",
+]
 SPDX-License-Identifier = "MIT OR Apache-2.0"
 
 [[annotations]]
 path = "cga_analysis/src/callgraph/bigraph/bfs.rs"
 precedence = "override"
-SPDX-FileCopyrightText = "Samuel Tardieu <sam@rfc1149.net>"
+SPDX-FileCopyrightText = [
+    "Samuel Tardieu <sam@rfc1149.net>",
+    "OpenDevicePartnership/odp-platform-maintainers",
+]
 SPDX-License-Identifier = "MIT OR Apache-2.0"
 
 [[annotations]]
