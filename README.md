@@ -30,6 +30,7 @@ Other ways to extract callgraphs or detect panics include:
 * [charon](https://github.com/AeneasVerif/charon) (Rust MIR exporter)
 * [no-panic](https://crates.io/crates/no-panic) (Linker-based panic detection)
 * [dont_panic](https://github.com/Kixunil/dont_panic) (Linker-based panic detection)
+* [panic-never](https://github.com/japaric/panic-never) (Linker-based panic detection)
 
 Please let us know if a project is missing from this list.
 
