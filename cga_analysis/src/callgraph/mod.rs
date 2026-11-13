@@ -4,19 +4,17 @@ use indexmap::{
 };
 use rustc_middle::ty::{Instance, TyCtxt};
 
-use crate::{Use, UseKind};
+use crate::{Arrow, ArrowTarget};
 
 mod data;
 
 pub mod bigraph;
 
 /// The callgraph as used in the analysis step.
-///
-/// Each [`Use`] is annotated with the [`NodeId`] to give a deterministic ordering to the callgraph.
 #[derive(Clone, Debug)]
 pub struct Callgraph<'tcx> {
-    roots: IndexSet<Use<'tcx>>,
-    edges: IndexMap<Instance<'tcx>, IndexSet<Use<'tcx>>>,
+    roots: IndexSet<Arrow<'tcx>>,
+    edges: IndexMap<Instance<'tcx>, IndexSet<Arrow<'tcx>>>,
 }
 
 impl<'tcx> Callgraph<'tcx> {
@@ -28,20 +26,23 @@ impl<'tcx> Callgraph<'tcx> {
     }
 
     pub fn register_root(&mut self, instance: Instance<'tcx>, tcx: TyCtxt<'tcx>) {
-        let root_node = instance.def_id().expect_local();
-        let hir_id = tcx.local_def_id_to_hir_id(root_node);
-        let span = tcx.hir_span(hir_id);
+        // Only collect local root nodes.
+        // This excludes tcx.lang_items().start_fn(), which is never local.
+        if let Some(root_node) = instance.def_id().as_local() {
+            let hir_id = tcx.local_def_id_to_hir_id(root_node);
+            let span = tcx.hir_span(hir_id);
 
-        let use_ = Use {
-            kind: UseKind::Entrypoint(instance),
-            span,
-            hir_id: Some(hir_id),
-        };
+            let arrow = Arrow {
+                target: ArrowTarget::Entrypoint(instance),
+                span,
+                hir_id: Some(hir_id),
+            };
 
-        self.roots.insert(use_);
+            self.roots.insert(arrow);
+        }
     }
 
-    pub fn register_edge(&mut self, from: Instance<'tcx>, to: Use<'tcx>) {
+    pub fn register_edge(&mut self, from: Instance<'tcx>, to: Arrow<'tcx>) {
         self.edges.entry(from).or_default().insert(to);
     }
 
@@ -58,17 +59,17 @@ impl<'tcx> Callgraph<'tcx> {
     }
 
     /// Quickly iterates over all edges.
-    pub fn edges(&self) -> impl Iterator<Item = (Option<&Instance<'tcx>>, &Use<'tcx>)> {
-        self.roots.iter().map(|use_| (None, use_)).chain(
+    pub fn edges(&self) -> impl Iterator<Item = (Option<&Instance<'tcx>>, &Arrow<'tcx>)> {
+        self.roots.iter().map(|arrow| (None, arrow)).chain(
             self.edges
                 .iter()
                 .flat_map(|(from, tos)| tos.iter().map(move |to| (Some(from), to))),
         )
     }
 
-    pub fn cut_edges(&mut self, f: impl Fn(&Use<'tcx>) -> bool) {
+    pub fn cut_edges(&mut self, f: impl Fn(&Arrow<'tcx>) -> bool) {
         for (_, tos) in self.edges.iter_mut() {
-            tos.retain(|use_| !f(use_));
+            tos.retain(|arrow| !f(arrow));
         }
     }
 }

@@ -1,9 +1,11 @@
 use std::rc::Rc;
 
 use indexmap::{IndexMap, IndexSet};
-use rustc_middle::ty::{Instance, TyCtxt};
+use rustc_middle::ty::Instance;
 
-use crate::{Use, callgraph::Callgraph};
+use crate::{Arrow, callgraph::Callgraph};
+
+mod bfs;
 
 #[derive(Clone, Debug)]
 pub struct BiCallgraph<'tcx> {
@@ -23,18 +25,18 @@ pub enum Node<'tcx> {
 pub struct Edge<'tcx> {
     pub from: Node<'tcx>,
     pub to: Node<'tcx>,
-    pub use_: Use<'tcx>,
+    pub arrow: Arrow<'tcx>,
 }
 
-impl<'tcx> From<&Use<'tcx>> for Node<'tcx> {
-    fn from(value: &Use<'tcx>) -> Self {
-        match value.kind {
-            crate::UseKind::Entrypoint(instance)
-            | crate::UseKind::Called(instance)
-            | crate::UseKind::VTableCalled(instance)
-            | crate::UseKind::FnPtrCast(instance) => Node::Item(instance),
-            crate::UseKind::BuiltinMirAssert => Node::Assert,
-            crate::UseKind::AsyncPanic => Node::AsyncPanic,
+impl<'tcx> From<&Arrow<'tcx>> for Node<'tcx> {
+    fn from(value: &Arrow<'tcx>) -> Self {
+        match value.target {
+            crate::ArrowTarget::Entrypoint(instance)
+            | crate::ArrowTarget::Called(instance)
+            | crate::ArrowTarget::VTableCalled(instance)
+            | crate::ArrowTarget::FnPtrCast(instance) => Node::Item(instance),
+            crate::ArrowTarget::BuiltinMirAssert => Node::Assert,
+            crate::ArrowTarget::AsyncPanic => Node::AsyncPanic,
         }
     }
 }
@@ -48,12 +50,12 @@ impl<'tcx> From<&Callgraph<'tcx>> for BiCallgraph<'tcx> {
             let from = Node::Item(*from);
             let from_edges = edges.entry(from).or_default();
 
-            for use_ in tos.iter() {
-                let to = Node::from(use_);
+            for arrow in tos.iter() {
+                let to = Node::from(arrow);
                 let edge = Edge {
                     from,
                     to,
-                    use_: use_.clone(),
+                    arrow: *arrow,
                 };
 
                 from_edges.insert(edge);
@@ -63,12 +65,12 @@ impl<'tcx> From<&Callgraph<'tcx>> for BiCallgraph<'tcx> {
 
         let entrypoint = Node::Entrypoint;
         let entrypoints = edges.entry(entrypoint).or_default();
-        for use_ in value.roots.iter() {
-            let to = Node::from(use_);
+        for arrow in value.roots.iter() {
+            let to = Node::from(arrow);
             let edge = Edge {
                 from: entrypoint,
                 to,
-                use_: use_.clone(),
+                arrow: *arrow,
             };
             entrypoints.insert(edge);
             rev_edges.entry(to).or_default().insert(edge);
@@ -84,13 +86,12 @@ impl<'tcx> BiCallgraph<'tcx> {
     }
 
     /// Find all the crate boundaries from a leaf node.
-    pub fn find_boundaries<'a>(&'a self, leaf: &'a Use<'tcx>, tcx: TyCtxt<'tcx>, mut f: impl FnMut(&'a Use<'tcx>)) {
+    pub fn find_boundaries<'a>(&'a self, leaf: &'a Arrow<'tcx>, mut f: impl FnMut(&'a Arrow<'tcx>)) {
         fn visit_node<'a, 'tcx>(
             this: &'a BiCallgraph<'tcx>,
             to: Node<'tcx>,
-            tcx: TyCtxt<'tcx>,
             visited: &mut IndexSet<Node<'tcx>>,
-            f: &mut impl FnMut(&'a Use<'tcx>),
+            f: &mut impl FnMut(&'a Arrow<'tcx>),
         ) {
             if !visited.insert(to) {
                 return;
@@ -98,12 +99,12 @@ impl<'tcx> BiCallgraph<'tcx> {
 
             if let Some(edges) = this.rev_edges.get(&to) {
                 for edge in edges {
-                    if edge.use_.hir_id.is_some() {
-                        f(&edge.use_);
+                    if edge.arrow.hir_id.is_some() {
+                        f(&edge.arrow);
                         continue;
                     }
 
-                    visit_node(this, edge.from, tcx, visited, f);
+                    visit_node(this, edge.from, visited, f);
                 }
             }
         }
@@ -118,18 +119,18 @@ impl<'tcx> BiCallgraph<'tcx> {
 
         if let Some(edges) = self.rev_edges.get(&callee) {
             for edge in edges {
-                if edge.use_ != *leaf {
+                if edge.arrow != *leaf {
                     continue;
                 }
 
-                visit_node(self, edge.from, tcx, &mut visited, &mut f);
+                visit_node(self, edge.from, &mut visited, &mut f);
             }
         }
     }
 
-    pub fn find_shortest_from_roots(&self, boundaries: &IndexSet<Use<'tcx>>) -> Option<Vec<Edge<'tcx>>> {
+    pub fn find_shortest_from_roots(&self, boundaries: &IndexSet<Arrow<'tcx>>) -> Option<Vec<Edge<'tcx>>> {
         for e in self.edges() {
-            if boundaries.contains(&e.use_)
+            if boundaries.contains(&e.arrow)
                 && let Some(mut trace) =
                     self.bfs_bidirectional(std::iter::once(Node::Entrypoint), std::iter::once(e.from))
             {
@@ -174,92 +175,6 @@ impl<'tcx> BiCallgraph<'tcx> {
 
     fn predecessors(&self, node: Node<'tcx>) -> impl Iterator<Item = &Edge<'tcx>> {
         self.rev_edges.get(&node).into_iter().flat_map(|edges| edges.iter())
-    }
-
-    /// Bidirectional Breadth First Search
-    ///
-    /// Copied from the `pathfinding` crate and adapted to this graph structure.
-    fn bfs_bidirectional(
-        &self,
-        starts: impl Iterator<Item = Node<'tcx>>,
-        ends: impl Iterator<Item = Node<'tcx>>,
-    ) -> Option<Vec<Edge<'tcx>>> {
-        let mut predecessors: IndexMap<Node<'tcx>, Option<usize>> = IndexMap::default();
-        predecessors.extend(starts.map(|n| (n, None)));
-        let mut successors: IndexMap<Node<'tcx>, Option<usize>> = IndexMap::default();
-        successors.extend(ends.map(|n| (n, None)));
-
-        if predecessors.keys().any(|node| successors.contains_key(node)) {
-            return Some(vec![]); // We are already here.
-        }
-
-        let mut i_forwards = 0;
-        let mut i_backwards = 0;
-        let middle = 'l: loop {
-            for _ in 0..(predecessors.len() - i_forwards) {
-                let node = *predecessors.get_index(i_forwards).unwrap().0;
-                for successor_edge in self.successors(node) {
-                    let successor_node = successor_edge.to;
-                    if !predecessors.contains_key(&successor_node) {
-                        predecessors.insert(successor_node, Some(i_forwards));
-                    }
-                    if successors.contains_key(&successor_node) {
-                        break 'l Some(successor_node);
-                    }
-                }
-                i_forwards += 1;
-            }
-
-            for _ in 0..(successors.len() - i_backwards) {
-                let node = *successors.get_index(i_backwards).unwrap().0;
-                for predecessor_edge in self.predecessors(node) {
-                    let predecessor_node = predecessor_edge.from;
-                    if !successors.contains_key(&predecessor_node) {
-                        successors.insert(predecessor_node, Some(i_backwards));
-                    }
-                    if predecessors.contains_key(&predecessor_node) {
-                        break 'l Some(predecessor_node);
-                    }
-                }
-                i_backwards += 1;
-            }
-
-            if i_forwards == predecessors.len() && i_backwards == successors.len() {
-                break 'l None;
-            }
-        };
-
-        middle.map(|middle| {
-            // Path found!
-            // Build the path.
-            let mut path: Vec<Edge<'tcx>> = vec![];
-            // From middle to the start.
-            let mut node = Some(middle.clone());
-            while let Some(n) = node {
-                node = predecessors[&n].map(|i| {
-                    let prev = *predecessors.get_index(i).unwrap().0;
-                    path.push(*self.predecessors(n).find(|e| e.from == prev).unwrap());
-                    prev
-                });
-            }
-            // Reverse, to put start at the front.
-            path.reverse();
-            // And from middle to the end.
-            let mut node = successors[&middle].map(|i| {
-                let next = successors.get_index(i).unwrap().0.clone();
-                path.push(*self.successors(middle).find(|e| e.to == next).unwrap());
-                next
-            });
-            while let Some(n) = node {
-                node = successors[&n].map(|i| {
-                    let next = *successors.get_index(i).unwrap().0;
-                    path.push(*self.successors(n).find(|e| e.to == next).unwrap());
-                    next
-                });
-            }
-
-            path
-        })
     }
 }
 
@@ -352,7 +267,7 @@ impl<'tcx> Iterator for TraceIterator<'tcx> {
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(inner) = self.inner.take() {
             self.inner = inner.parent.clone();
-            Some(inner.current.clone())
+            Some(inner.current)
         } else {
             None
         }

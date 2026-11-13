@@ -6,8 +6,7 @@ LL |     let _ptr = u64::strict_add as *const fn(u64) -> u64;
    |
    = note: this location is called in 2 different traces
    = note: 3 different panics from this location
-   = note: once a function is cast to a function pointer, cga can no longer tell how it is used
-   = note: as a precaution, it must assume you will eventually call the function
+   = note: when casting to a function pointer, we will assume that it will be called at some point
    = note: backtrace (1 of 4):
            0: std::rt::panic_fmt (called)
            1: core::num::imp::overflow_panic::add (called)
