@@ -85,7 +85,10 @@ impl TestContext {
         defaults.diagnostic_code_prefix = Some(Spanned::dummy("cga::".into())).into();
         config.with_args(&self.args);
 
-        config.filter(&get_rustc_sysroot().to_string_lossy(), "rustc-sysroot");
+        let sysroot_filter = (Match::from(get_rustc_sysroot().as_path()), b"rustc-sysroot".to_vec());
+        let defaults = config.comment_defaults.base();
+        defaults.normalize_stderr.push(sysroot_filter.clone());
+        defaults.normalize_stdout.push(sysroot_filter);
         config.filter("cga-emit:.*\n", "");
 
         config.program.args.extend(
@@ -156,6 +159,7 @@ fn run_ui(cx: &TestContext) {
 
 fn run_ui_cargo(cx: &TestContext) {
     let mut config = cx.base_config("ui-cargo", false);
+    config.comment_start = "#";
     config.program.input_file_flag = CommandBuilder::cargo().input_file_flag;
     config.program.out_dir_flag = CommandBuilder::cargo().out_dir_flag;
     config.program.args = vec![

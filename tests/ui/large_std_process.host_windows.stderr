@@ -1,0 +1,44 @@
+error: call to associated function `std::process::Command::new` which can panic
+  --> tests/ui/large_std_process.rs:2:13
+   |
+LL |     let _ = std::process::Command::new("evil");
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: 8 different panics from this location
+   = note: backtrace (1 of 62):
+           0: core::panicking::panic_nounwind_fmt (called)
+           1: core::num::<impl usize>::unchecked_mul::precondition_check (called)
+           2: core::num::<impl usize>::unchecked_mul (called)
+           3: alloc::raw_vec::RawVecInner::current_memory (called)
+           4: alloc::raw_vec::RawVecInner::deallocate (called)
+           5: <alloc::raw_vec::RawVec<std::sys::args::windows::Arg> as std::ops::Drop>::drop (called)
+           6: drop of `alloc::raw_vec::RawVec<std::sys::args::windows::Arg>` (called)
+           7: drop of `std::vec::Vec<std::sys::args::windows::Arg>` (called)
+           8: std::sys::process::windows::Command::new (called)
+           9: std::process::Command::new::<&str> (called) <--
+           10: large_std_process::test (called)
+           11: large_std_process::main (entrypoint)
+   = note: `#[deny(cga::panics)]` on by default
+
+error: call to drop of `std::process::Command` which can panic
+  --> tests/ui/large_std_process.rs:2:47
+   |
+LL |     let _ = std::process::Command::new("evil");
+   |                                               ^
+   |
+   = note: 7 different panics from this location
+   = note: backtrace (1 of 323):
+           0: core::panicking::panic_nounwind_fmt (called)
+           1: std::ptr::read::precondition_check (called)
+           2: std::ptr::read::<std::alloc::Global> (called)
+           3: std::mem::ManuallyDrop::<std::alloc::Global>::take (called)
+           4: <std::collections::BTreeMap<std::sys::process::windows::EnvKey, std::option::Option<std::ffi::OsString>> as std::ops::Drop>::drop (called)
+           5: drop of `std::collections::BTreeMap<std::sys::process::windows::EnvKey, std::option::Option<std::ffi::OsString>>` (called)
+           6: drop of `std::sys::process::env::CommandEnv` (called)
+           7: drop of `std::sys::process::windows::Command` (called)
+           8: drop of `std::process::Command` (called) <--
+           9: large_std_process::test (called)
+           10: large_std_process::main (entrypoint)
+
+error: aborting due to 2 previous errors
+
