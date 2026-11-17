@@ -24,20 +24,20 @@ extern crate rustc_span;
 extern crate rustc_trait_selection;
 extern crate rustc_type_ir;
 
-mod callgraph;
 mod dyn_object;
 mod errors;
 mod panics;
 
+pub mod analysis;
+pub mod callgraph;
 pub mod diagnostics;
 pub mod monomorphize;
-pub mod post_mono;
 
 use rustc_hir::{HirId, def_id::DefId};
 use rustc_lint_defs::declare_tool_lint;
 use rustc_middle::{
     mir::{Body, SourceInfo},
-    ty::{Instance, TyCtxt, print::with_resolve_crate_name},
+    ty::{Instance, print::with_resolve_crate_name},
 };
 use rustc_span::Span;
 
@@ -57,57 +57,33 @@ declare_tool_lint! {
     report_in_external_macro: true
 }
 
-// for intra-doc links
-#[rustfmt::skip]
-#[allow(unused_imports)]
-use rustc_middle::{
-    mir::TerminatorKind,
-    ty::{GenericArgsRef, ParamEnv},
-};
-
 use crate::callgraph::Callgraph;
 
-/// Context used for analysis for a given root node.
-struct AnalysisState<'a, 'tcx> {
-    /// Type context.
-    tcx: TyCtxt<'tcx>,
-
-    /// The callgraph currently being constructed.
-    callgraph: &'a mut Callgraph<'tcx>,
-}
-
-impl<'tcx> AnalysisState<'_, 'tcx> {
-    pub fn register_root(&mut self, instance: Instance<'tcx>) {
-        self.callgraph.register_root(instance, self.tcx);
-    }
-
-    pub fn register_edge(&mut self, from: Instance<'tcx>, to: Use<'tcx>) {
-        self.callgraph.register_edge(from, to);
-    }
-}
-
-/// A Use of a function or a panic.
+/// The [Arrow] from a site in the MIR tree, to something denoted by [ArrowTarget].
+///
+/// The origin of the [Arrow] is loosely denoted by its span and possibly the local [HirId].
+/// Thus getting the origin of an [Arrow] is not possible without the context of an entire [Callgraph].
+///
+/// Note that for [ArrowTarget::Entrypoint] a pseudo-Arrow is created that points from itself to itself.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct Use<'tcx> {
-    /// The kind associated with the [`Use`].
+pub struct Arrow<'tcx> {
+    /// The kind associated with the [`Arrow`].
     ///
     /// When calling a function, refers to the monomorphized [`Instance`] of the function called.
-    kind: UseKind<'tcx>,
+    target: ArrowTarget<'tcx>,
 
-    /// The calling location of the [`Use`].
+    /// The origin location of the [`Arrow`].
     span: Span,
 
-    /// The HIR node associated with the calling location, necessary for emitting diagnostics.
+    /// The HIR node associated with the origin location, necessary for emitting diagnostics.
     ///
     /// Only applicable for nodes within our local crate.
     hir_id: Option<HirId>,
 }
 
-/// Nodes in a call graph.
-///
-/// Each node is a *possible* call to monomorphized functions (possibly), or panic.
+/// Pointy end of an [Arrow], denoting what is reachable.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-enum UseKind<'tcx> {
+pub enum ArrowTarget<'tcx> {
     /// The instance is an entrypoint for the application.
     ///
     /// And entrypoint could be an extern "c" function, an ISR, main, etc.
@@ -124,7 +100,7 @@ enum UseKind<'tcx> {
 
     /// A builtin assertion in MIR which can panic.
     ///
-    /// For example OverflowAdd will generate a terminator with [TerminatorKind::Assert].
+    /// For example OverflowAdd will generate a terminator with [rustc_middle::mir::TerminatorKind::Assert].
     BuiltinMirAssert,
 
     /// The implicit panic(s) associated with any async coroutine.
@@ -136,33 +112,33 @@ enum UseKind<'tcx> {
     AsyncPanic,
 }
 
-impl<'tcx> Use<'tcx> {
-    fn for_location(kind: UseKind<'tcx>, body: &Body<'tcx>, source: SourceInfo) -> Use<'tcx> {
-        Use {
-            kind,
+impl<'tcx> Arrow<'tcx> {
+    fn for_location(target: ArrowTarget<'tcx>, body: &Body<'tcx>, source: SourceInfo) -> Arrow<'tcx> {
+        Arrow {
+            target,
             span: source.span,
             hir_id: source.scope.lint_root(&body.source_scopes),
         }
     }
 
     pub fn opt_def_id(&self) -> Option<DefId> {
-        match self.kind {
-            UseKind::Called(instance)
-            | UseKind::VTableCalled(instance)
-            | UseKind::FnPtrCast(instance)
-            | UseKind::Entrypoint(instance) => Some(instance.def_id()),
-            UseKind::BuiltinMirAssert => None,
-            UseKind::AsyncPanic => None,
+        match self.target {
+            ArrowTarget::Called(instance)
+            | ArrowTarget::VTableCalled(instance)
+            | ArrowTarget::FnPtrCast(instance)
+            | ArrowTarget::Entrypoint(instance) => Some(instance.def_id()),
+            ArrowTarget::BuiltinMirAssert => None,
+            ArrowTarget::AsyncPanic => None,
         }
     }
 
     pub fn opt_instance(&self) -> Option<&Instance<'tcx>> {
-        match &self.kind {
-            UseKind::FnPtrCast(instance)
-            | UseKind::Called(instance)
-            | UseKind::VTableCalled(instance)
-            | UseKind::Entrypoint(instance) => Some(instance),
-            UseKind::BuiltinMirAssert | UseKind::AsyncPanic => None,
+        match &self.target {
+            ArrowTarget::FnPtrCast(instance)
+            | ArrowTarget::Called(instance)
+            | ArrowTarget::VTableCalled(instance)
+            | ArrowTarget::Entrypoint(instance) => Some(instance),
+            ArrowTarget::BuiltinMirAssert | ArrowTarget::AsyncPanic => None,
         }
     }
 }

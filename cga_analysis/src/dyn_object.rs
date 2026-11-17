@@ -11,8 +11,6 @@ pub(crate) fn dyn_object_call_to_impl_methods<'tcx>(
 ) -> Vec<Instance<'tcx>> {
     let trait_def_id = tcx.parent(virtual_def_id);
 
-    debug!("determining implementors {virtual_def_id:?} by checking out {trait_def_id:?}");
-
     let typing_env = TypingEnv::codegen(tcx, virtual_def_id);
 
     // When a dyn object vtable call is made, assume all impls of that trait are called.
@@ -48,11 +46,7 @@ pub(crate) fn dyn_object_call_to_impl_methods<'tcx>(
                     .chain(GenericArgs::identity_for_item(tcx, virtual_def_id).iter().skip(1)),
             );
 
-            if let Ok(instance_opt) = Instance::try_resolve(tcx, typing_env, virtual_def_id, trait_args) {
-                instance_opt
-            } else {
-                None
-            }
+            Instance::try_resolve(tcx, typing_env, virtual_def_id, trait_args).unwrap_or_default()
         })
         .collect()
 }

@@ -2,18 +2,18 @@ use lazy_regex::regex;
 use rustc_hir::def_id::DefId;
 use rustc_middle::ty::TyCtxt;
 
-use crate::{Use, UseKind};
+use crate::{Arrow, ArrowTarget};
 
-/// Determination if a [`Use`] is a kind of panic.
+/// Determination if a [`Arrow`] is a kind of panic.
 ///
-/// Derived using [`Use::panic_status`].
+/// Derived using [`Arrow::panic_status`].
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum PanicStatus {
-    /// Use is not a call any panic impl.
+    /// Arrow is not a call any panic impl.
     NoDirectPanic,
-    /// Use is a call to a panic impl.
+    /// Arrow is a call to a panic impl.
     PanicImpl,
-    /// Use is a MIR assert terminator.
+    /// Arrow is a MIR assert terminator.
     ///
     /// An example would be the overflow check with a plain addition ex.: `1 + 1`
     ///
@@ -53,14 +53,14 @@ pub fn item_is_panic_impl(tcx: TyCtxt<'_>, def_id: DefId) -> PanicStatus {
     PanicStatus::NoDirectPanic
 }
 
-impl Use<'_> {
-    /// Determines whether the [`Use`] panics and how.
+impl Arrow<'_> {
+    /// Determines whether the [`Arrow`] panics and how.
     ///
-    /// Only checks this specific [`Use`], and does not expand the call tree below.
+    /// Only checks this specific [`Arrow`], and does not expand the call tree below.
     pub fn panic_status(&self, tcx: TyCtxt<'_>) -> PanicStatus {
-        match &self.kind {
-            UseKind::BuiltinMirAssert => PanicStatus::Asserts,
-            UseKind::AsyncPanic => PanicStatus::PanicImpl, // Will always panic.
+        match &self.target {
+            ArrowTarget::BuiltinMirAssert => PanicStatus::Asserts,
+            ArrowTarget::AsyncPanic => PanicStatus::PanicImpl, // Will always panic.
             _ => {
                 // Check if callee is an implementation which
                 // colloquially would be called a 'panic'.

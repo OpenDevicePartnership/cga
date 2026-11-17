@@ -25,25 +25,20 @@ use cga_analysis::{BLACKLISTED, PANICS};
 
 struct Cga;
 
-fn post_mono_pass<'tcx>(
+fn cga_pass<'tcx>(
     tcx: TyCtxt<'tcx>,
     _: (),
 ) -> rustc_middle::queries::collect_and_partition_mono_items::ProvidedValue<'tcx> {
+    // Run the original pass first.
     let items = (rustc_interface::passes::DEFAULT_QUERY_PROVIDERS
         .queries
         .collect_and_partition_mono_items)(tcx, ());
 
+    // If the ENV variable is set, run CGA specific operations.
     if let Ok(input) = std::env::var("CGA_INPUT") {
         let input: cga_data::cmd::DriverInput = serde_json::from_str(&input).expect("Invalid CGA_INPUT format");
 
-        let roots = cga_analysis::monomorphize::collect_roots(
-            tcx,
-            cga_analysis::monomorphize::MonoItemCollectionStrategy::NoConstOrStatic,
-        )
-        .into_iter()
-        .collect();
-
-        let callgraph = cga_analysis::post_mono::generate_callgraph(tcx, roots);
+        let callgraph = cga_analysis::analysis::extract_from_roots(tcx);
 
         if let Some(config) = input.lint {
             cga_analysis::diagnostics::emit_lints(callgraph.clone(), &config, tcx);
@@ -88,8 +83,7 @@ impl Callbacks for Cga {
             store.register_lints(&[PANICS, BLACKLISTED]);
         }));
 
-        config.override_queries =
-            Some(|_session, queries| queries.queries.collect_and_partition_mono_items = post_mono_pass);
+        config.override_queries = Some(|_session, queries| queries.queries.collect_and_partition_mono_items = cga_pass);
     }
 
     fn after_analysis<'tcx>(
@@ -103,7 +97,6 @@ impl Callbacks for Cga {
 }
 
 fn main() -> ExitCode {
-    // rustc_driver::install_ice_hook("https://github.com/Wassasin/cga/issues/new", |_| ());
     let early_dcx = EarlyDiagCtxt::new(ErrorOutputType::default());
 
     rustc_driver::init_rustc_env_logger(&early_dcx);
