@@ -4,7 +4,7 @@ use rustc_data_structures::fx::FxHashSet;
 use rustc_middle::ty::TyCtxt;
 use rustc_span::{Span, Symbol};
 
-use crate::{Use, canonical_path, simplified_path};
+use crate::{Arrow, canonical_path, simplified_path};
 
 pub struct LintRuleSet {
     path: RegexSet,
@@ -13,7 +13,7 @@ pub struct LintRuleSet {
 }
 
 impl LintRuleSet {
-    pub fn new<'a>(rules: &Vec<LintRule>) -> Result<Self, lazy_regex::regex::Error> {
+    pub fn new(rules: &[LintRule]) -> Result<Self, lazy_regex::regex::Error> {
         let mut path_regexes = vec![];
         let mut canonical_regexes = vec![];
         let mut crates = FxHashSet::default();
@@ -35,10 +35,10 @@ impl LintRuleSet {
         })
     }
 
-    /// Use is covered by any rule.
-    pub fn use_applies<'tcx>(&self, use_: &Use<'tcx>, tcx: TyCtxt<'tcx>) -> bool {
+    /// Arrow is covered by any rule.
+    pub fn arrow_applies<'tcx>(&self, arrow: &Arrow<'tcx>, tcx: TyCtxt<'tcx>) -> bool {
         // Compute path-based rule.
-        if let Some(instance) = use_.opt_instance() {
+        if let Some(instance) = arrow.opt_instance() {
             if self.path.is_match(&simplified_path(instance)) {
                 return true;
             }
@@ -49,7 +49,7 @@ impl LintRuleSet {
         }
 
         // Compute crate-based rule.
-        if self.crate_.contains(span_to_cratename(&use_.span, tcx).as_str()) {
+        if self.crate_.contains(span_to_cratename(&arrow.span, tcx).as_str()) {
             return true;
         }
 
